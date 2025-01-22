@@ -16,10 +16,12 @@ from Utils.normalize_add_expensive_edge import add_expensive_edge
 
 # size (4,num_agents+num_nodes,num_nodes)
 Belief_State: TypeAlias = jnp.ndarray
-EnvState: TypeAlias = jnp.ndarray
+EnvState: TypeAlias = (
+    jnp.ndarray
+)  # Only contains blocking status (to save on memory usage)
 
 
-class CTP_General(MultiAgentEnv):
+class MA_CTP_General(MultiAgentEnv):
     def __init__(
         self,
         num_agents: int,
@@ -31,7 +33,6 @@ class CTP_General(MultiAgentEnv):
         reward_for_invalid_action=-200.0,
         reward_for_goal=0,
         handcrafted_graph=None,
-        patience=5,
         num_stored_graphs=10,
         loaded_graphs=None,
     ):
@@ -43,7 +44,6 @@ class CTP_General(MultiAgentEnv):
         reward_for_goal:int
         action_spaces
         graph_realisation: CTPGraph_Realisation
-        patience: int # How many times we try to find a solvable blocking status before giving up
         num_stored_graphs: int # Number of stored graphs to choose from
         """
         super().__init__(num_agents=num_agents)
@@ -51,7 +51,6 @@ class CTP_General(MultiAgentEnv):
         self.reward_for_invalid_action = jnp.float16(reward_for_invalid_action)
         self.reward_for_goal = jnp.float16(reward_for_goal)
         self.num_nodes = num_nodes
-        self.patience = patience
         self.num_stored_graphs = num_stored_graphs
 
         actions = [num_nodes + 1 for _ in range(num_agents)]
@@ -112,41 +111,30 @@ class CTP_General(MultiAgentEnv):
         index = jax.random.randint(
             subkey, shape=(), minval=0, maxval=self.num_stored_graphs - 1
         )
-        current_graph_weights = self.stored_graphs[index, 0, :, :]
-        current_graph_blocking_prob = self.stored_graphs[index, 1, :, :]
-        current_graph_origins = self.stored_graphs[index, 2, 0, :]
-        current_graph_goals = self.stored_graphs[index, 2, 1, :]
+        graph_weights = self.stored_graphs[index, 0, :, :]
+        graph_blocking_prob = self.stored_graphs[index, 1, :, :]
+        graph_origins = self.stored_graphs[index, 2, 0, :]
+        graph_goals = self.stored_graphs[index, 2, 1, :]
 
         # Get solvable realisation. Add expensive edges as necessary
-        new_blocking_status = graph_functions.sample_blocking_status(
-            subkey, current_graph_blocking_prob
+        blocking_status = graph_functions.sample_blocking_status(
+            subkey, graph_blocking_prob
         )
 
-        new_blocking_status, current_graph_weights, current_graph_blocking_prob = (
-            add_expensive_edge(
-                current_graph_weights,
-                current_graph_blocking_prob,
-                new_blocking_status,
-                current_graph_origins,
-                current_graph_goals,
-            )
+        blocking_status, graph_weights, graph_blocking_prob = add_expensive_edge(
+            graph_weights,
+            graph_blocking_prob,
+            blocking_status,
+            graph_origins,
+            graph_goals,
         )
         # If don't normalize using full observability, can normalize after adding expensive edge
 
-        env_state = self.__convert_graph_realisation_to_state(
-            current_graph_origins,
-            current_graph_goals,
-            new_blocking_status,
-            current_graph_weights,
-            current_graph_blocking_prob,
-        )
+        env_state = blocking_status
+        # return the initial belief state
+        original_observation = self.get_obs(env_state)
 
-    def __convert_graph_realisation_to_state(
-        self,
-        origins: jnp.array,
-        goals: jnp.array,
-        blocking_status: jnp.ndarray,
-        graph_weights: jnp.ndarray,
-        blocking_prob: jnp.ndarray,
-    ) -> EnvState:
-        agents_pos = jnp.zeros((self.num_agents, self.num_nodes), dtype=jnp.float16)
+    @partial(jax.jit, static_argnums=(0,))
+    def get_obs(self, env_state: EnvState) -> jnp.ndarray:
+        # Returns observation for each agent
+        pass
