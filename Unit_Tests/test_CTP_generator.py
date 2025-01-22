@@ -4,6 +4,7 @@ import sys
 
 sys.path.append("..")
 from Environment import CTP_generator
+from Utils.normalize_add_expensive_edge import get_solvability_matrix
 import argparse
 import os
 import pytest
@@ -14,7 +15,7 @@ import pytest_print as pp
 def graphRealisation():
     key = jax.random.PRNGKey(101)
     graphRealisation = CTP_generator.CTPGraph_Realisation(
-        key, 5, prop_stoch=0.4, num_agents=2
+        key, 10, prop_stoch=0.4, num_agents=2
     )
     return graphRealisation
 
@@ -53,11 +54,10 @@ def test_plotting(printer, graphRealisation: CTP_generator.CTPGraph_Realisation)
     key = jax.random.PRNGKey(50)
     blocking_status = graphRealisation.sample_blocking_status(key)
     graphRealisation.plot_realised_graph(blocking_status, log_directory)
-    printer(graphRealisation.graph.weights)
 
 
 def test_resample(graphRealisation: CTP_generator.CTPGraph_Realisation):
-    key = jax.random.PRNGKey(50)
+    key = jax.random.PRNGKey(51)
     key, subkey = jax.random.split(key)
     old_blocking_status = graphRealisation.sample_blocking_status(key)
     new_blocking_status = graphRealisation.sample_blocking_status(subkey)
@@ -75,3 +75,51 @@ def test_check_blocking_status(graphRealisation: CTP_generator.CTPGraph_Realisat
                 assert int(blocking_status[i, j]) is CTP_generator.BLOCKED
             if graphRealisation.graph.blocking_prob[i, j] == 0:
                 assert int(blocking_status[i, j]) is CTP_generator.UNBLOCKED
+
+
+# test that the origins are the first n_agents nodes, the special node is the last node, and goals before special node
+# test that the special node is not connected to any other node
+def test_goal_origin_special_node(graphRealisation: CTP_generator.CTPGraph_Realisation):
+    expected_origin_array = jnp.arange(0, graphRealisation.graph.num_agents)
+    assert jnp.array_equal(expected_origin_array, graphRealisation.graph.origin)
+    expected_goal_array = jnp.arange(
+        graphRealisation.graph.n_nodes - graphRealisation.graph.num_agents - 1,
+        graphRealisation.graph.n_nodes - 1,
+    )
+    assert jnp.array_equal(expected_goal_array, graphRealisation.graph.goal)
+    assert graphRealisation.graph.n_nodes - 1 not in graphRealisation.graph.goal
+
+    # Assert that the special node is not connected to any other node
+    assert jnp.all(graphRealisation.graph.weights[-1, :] == CTP_generator.NOT_CONNECTED)
+    assert jnp.all(graphRealisation.graph.weights[:, -1] == CTP_generator.NOT_CONNECTED)
+
+
+# test the solvability function (in Utils, not in CTP_generator)
+def test_solvability_pair(graphRealisation: CTP_generator.CTPGraph_Realisation):
+    # graph plotted above
+    key = jax.random.PRNGKey(50)
+    blocking_status = graphRealisation.sample_blocking_status(key)
+    assert jnp.array_equal(
+        get_solvability_matrix(
+            graphRealisation.graph.weights,
+            blocking_status,
+            graphRealisation.graph.origin,
+            graphRealisation.graph.goal,
+        ),
+        jnp.array([[True, True], [True, True]]),
+    )
+
+    # An unsolvable graph. Change blocking prob to all blocked
+    graphRealisation.graph.blocking_prob = jnp.ones(
+        (graphRealisation.graph.n_nodes, graphRealisation.graph.n_nodes)
+    )
+    blocking_status = graphRealisation.sample_blocking_status(key)
+    assert jnp.array_equal(
+        get_solvability_matrix(
+            graphRealisation.graph.weights,
+            blocking_status,
+            graphRealisation.graph.origin,
+            graphRealisation.graph.goal,
+        ),
+        jnp.array([[False, False], [False, False]]),
+    )

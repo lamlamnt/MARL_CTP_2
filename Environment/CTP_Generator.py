@@ -74,9 +74,13 @@ class CTPGraph:
 
             # Set origin and goal nodes
             self.origin = jnp.arange(0, self.num_agents)
-            self.goal = jnp.arange(self.n_nodes - self.num_agents, self.n_nodes)
+            self.goal = jnp.arange(self.n_nodes - self.num_agents - 1, self.n_nodes - 1)
 
-        # In single agent, would do initial normalization of the weights here
+        # Initial normalization
+        max_weight = jnp.max(self.weights)
+        self.weights = jnp.where(
+            self.weights != NOT_CONNECTED, self.weights / max_weight, NOT_CONNECTED
+        )
 
     # Returns the weight adjacency matrix and n_edges
     def __generate_connectivity_weight(
@@ -137,15 +141,17 @@ class CTPGraph:
         grid_nodes_jax = jnp.array(grid_nodes, dtype=jnp.float16).T
 
         # 2 nodes that are furthest apart from each other
-        first_goal, first_origin = self.__find_single_goal_and_origin(grid_nodes_jax)
+        far_1, far_2 = self.__find_single_goal_and_origin(grid_nodes_jax)
 
         # Sort nodes (including the origin and goal) by euclidean distance
         grid_nodes_jax = self.__sort_nodes_by_euclidean_distance(
-            grid_nodes_jax, first_origin, first_goal
+            grid_nodes_jax, far_1, far_2
         )
 
+        # far_1 is first origin. Far_2 -1 is the first goal. Far_2 is the special node
+
         # Apply Delauney triangulation to get edges
-        delaunay = Delaunay(grid_nodes_jax)
+        delaunay = Delaunay(grid_nodes_jax[:-1])
         simplices = delaunay.simplices
         simplices_jax = jnp.array(simplices)
 
@@ -169,6 +175,7 @@ class CTPGraph:
 
         # n_edges = int(jnp.sum(weights > 0) / 2)
         n_edges = len(senders)
+
         return weights, n_edges, senders, receivers, grid_nodes_jax
 
     # Find 2 nodes furthest apart
@@ -350,6 +357,7 @@ class CTPGraph_Realisation:
                 key, n_nodes, grid_size, prop_stoch, k_edges, num_agents
             )
 
+    # CTP_environment actually doesn't use this function - it uses the one in Utils
     def sample_blocking_status(self, key: jax.random.PRNGKey) -> jnp.ndarray:
         keys = jax.random.split(key, num=self.graph.n_edges)
         blocking_status = jnp.full(
@@ -435,5 +443,3 @@ class CTPGraph_Realisation:
         plt.legend(handles=legend_elements, loc="upper right")
         plt.savefig(os.path.join(directory, file_name))
         plt.close()
-
-    # Check solvability between an origin and a goal
