@@ -222,7 +222,7 @@ class MA_CTP_General(MultiAgentEnv):
             current_env_state, actions, agent_id = args
             reward = self.reward_for_goal
             # Update goal status
-            new_env_state = new_env_state.at[3, agent_id, actions[agent_id]].add(1)
+            new_env_state = current_env_state.at[3, agent_id, actions[agent_id]].add(1)
             agent_done = jnp.bool_(True)
             return (
                 current_env_state[0, agent_id, :],
@@ -248,7 +248,7 @@ class MA_CTP_General(MultiAgentEnv):
 
         def _for_done_agents(args) -> tuple[jnp.array, jnp.array, int, bool]:
             current_env_state, actions, agent_id = args
-            reward = 0
+            reward = jnp.float16(0)
             agent_done = jnp.bool_(True)
             return (
                 current_env_state[0, agent_id, :],
@@ -264,19 +264,19 @@ class MA_CTP_General(MultiAgentEnv):
             current_node = jnp.argmax(current_env_state[0, agent_id, :])
             agent_pos, goal_service, reward, done = jax.lax.cond(
                 done_agents[agent_id] == jnp.bool_(True),
-                _for_done_agents(current_env_state, actions, agent_id),
-                jax.lax.cond(
+                lambda args: _for_done_agents(args),
+                lambda args: jax.lax.cond(
                     _is_invalid_action(actions[agent_id], current_env_state, agent_id),
-                    _step_invalid_action(current_env_state, actions, agent_id),
-                    jax.lax.cond(
+                    lambda args: _step_invalid_action(args),
+                    lambda args: jax.lax.cond(
                         goal_service_agent[current_node] == agent_id,
-                        _service_goal(current_env_state, actions, agent_id),
-                        _move_to_new_node(current_env_state, actions, agent_id),
-                        operands=None,
+                        lambda args: _service_goal(args),
+                        lambda args: _move_to_new_node(args),
+                        args,
                     ),
-                    operands=None,
+                    args,
                 ),
-                operands=None,
+                (current_env_state, actions, agent_id),
             )
             return agent_pos, goal_service, reward, done
 
@@ -289,9 +289,15 @@ class MA_CTP_General(MultiAgentEnv):
         )
         new_env_state = new_env_state.at[3, : self.num_agents, :].set(all_goals_service)
 
-        # Get belief state for each agent based on new observations - vmap
-        # next_belief_states = jax.vmap(_get_belief_state_per_agent)()
-        # Get updated belief state from communication - vmap
+        # Get belief state for each agent based on new observations, including the stationary agents that are done
+        next_belief_states = jax.vmap(
+            self._get_belief_state_per_agent, in_axes=(None, 0, 0)
+        )(new_env_state, jnp.arange(self.num_agents), current_belief_state)
+
+        # Get updated belief state from communication, including the stationary agents that are done
+        next_belief_states = jax.vmap(
+            self._update_belief_state_due_to_full_communication, in_axes=(None, 0)
+        )(next_belief_states, jnp.arange(self.num_agents))
 
         # Add up rewards
         total_reward = jnp.sum(rewards)
@@ -336,31 +342,45 @@ class MA_CTP_General(MultiAgentEnv):
         # Combine current_blocking_status with new_observation
         new_blocking_knowledge = jnp.where(
             old_belief_state[0, self.num_agents :, :] == CTP_generator.UNKNOWN,
-            obs_blocking_status[self.num_agents :, :],
+            obs_blocking_status[:, :],
             old_belief_state[0, self.num_agents :, :],
         )
 
-        new_belief_state = current_env_state.at[0, self.num_agents :, :].set(
+        new_belief_state = old_belief_state.at[0, self.num_agents :, :].set(
             new_blocking_knowledge
         )
+        # Adjust other agents' positions
+        new_belief_state = new_belief_state.at[0, agent_id, :].set(agent_pos)
+        new_belief_state = new_belief_state.at[1, : self.num_agents, :].set(
+            current_env_state[0, : self.num_agents, :]
+        )
+        new_belief_state = new_belief_state.at[1, agent_id, :].set(0)
         return new_belief_state
 
     @partial(jax.jit, static_argnums=(0,))
     def _update_belief_state_due_to_full_communication(
         self, all_belief_states: jnp.ndarray, agent_id: int
     ) -> Belief_State:
-        # currently will just return 1 scalar -> maybe vmap across rows and columns
         blocked = jnp.any(
-            all_belief_states[:, 0, self.num_agents :, :] == CTP_generator.BLOCKED
+            all_belief_states[:, 0, self.num_agents :, :] == CTP_generator.BLOCKED,
+            axis=0,
+            keepdims=False,
         )  # If any agent says BLOCKED, it's BLOCKED
-        unblocked = jnp.all(
-            all_belief_states[:, 0, self.num_agents :, :] == CTP_generator.UNBLOCKED
+        unblocked = jnp.any(
+            all_belief_states[:, 0, self.num_agents :, :] == CTP_generator.UNBLOCKED,
+            axis=0,
+            keepdims=False,
         )  # If any agent says UNBLOCKED, it's UNBLOCKED
         combined = jnp.where(
             blocked,
             CTP_generator.BLOCKED,
             jnp.where(unblocked, CTP_generator.UNBLOCKED, CTP_generator.UNKNOWN),
-        )  # Apply priority logic
+        )  # UNKNOWN if UNKNOWN for all the agents
+        new_agent_belief_state = all_belief_states[agent_id]
+        new_agent_belief_state = new_agent_belief_state.at[0, self.num_agents :, :].set(
+            combined
+        )
+        return new_agent_belief_state
 
     # Returns an array of size num_nodes. If the element is inf, that means it's not a goal.
     # If -1, then no valid agent servicing that goal. If not -1 or inf then it's the index of the valid agent servicing the goal
@@ -375,19 +395,21 @@ class MA_CTP_General(MultiAgentEnv):
         # For each goal: check if any agent's pos is at the goal, the action is to service the goal, and the goal has not been serviced yet
         def _find_agent_servicing_goal(index):
             goal = goals[index]
-            not_serviced = not (
-                current_env_state[3, : self.num_agents, goal] == 0
-            ).all()
+            not_serviced = (current_env_state[3, : self.num_agents, goal] == 0).all()
             agents_servicing = actions == self.num_nodes
             agents_at_goal = current_env_state[
-                0, self.num_agents :, goal
+                0, : self.num_agents, goal
             ]  # 1 if at goal. 0 otherwise
             valid_agents = jnp.where(
-                jnp.logical_and(agents_servicing, agents_at_goal), 1, jnp.inf
+                jnp.logical_and(agents_servicing, agents_at_goal),
+                1,
+                jnp.iinfo(jnp.int16).max,
             )
             smallest_agent = jnp.argmin(valid_agents)
             final_smallest_agent = jnp.where(
-                jnp.logical_and(not_serviced, smallest_agent != jnp.inf),
+                jnp.logical_and(
+                    not_serviced, smallest_agent != jnp.iinfo(jnp.int16).max
+                ),
                 smallest_agent,
                 -1,
             )
@@ -397,7 +419,9 @@ class MA_CTP_General(MultiAgentEnv):
             jnp.arange(self.num_agents)
         )
 
-        full_goal_service_agent = jnp.full((self.num_nodes,), jnp.inf, dtype=jnp.int16)
+        full_goal_service_agent = jnp.full(
+            (self.num_nodes,), jnp.iinfo(jnp.int16).max, dtype=jnp.int16
+        )
         full_goal_service_agent = full_goal_service_agent.at[goals].set(
             goal_service_agent
         )
