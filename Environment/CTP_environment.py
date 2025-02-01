@@ -13,6 +13,7 @@ from tqdm import tqdm
 sys.path.append("..")
 from Utils import graph_functions
 from Utils.normalize_add_expensive_edge import add_expensive_edge
+import os
 
 # size (4,num_agents+num_nodes,num_nodes)
 Belief_State: TypeAlias = jnp.ndarray
@@ -53,6 +54,7 @@ class MA_CTP_General(MultiAgentEnv):
         self.num_nodes = num_nodes
         self.num_stored_graphs = num_stored_graphs
 
+        # +1 because service goal action
         actions = [num_nodes + 1 for _ in range(num_agents)]
         self.action_spaces = spaces.MultiDiscrete(actions)
 
@@ -78,6 +80,12 @@ class MA_CTP_General(MultiAgentEnv):
                 )
 
                 # Plot this for debugging purposes
+                current_directory = os.getcwd()
+                parent_dir = os.path.dirname(current_directory)
+                log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
+                graph_realisation.graph.plot_nx_graph(
+                    log_directory, "test_environment.png"
+                )
 
                 # Normalize the weights using the expected optimal path length under full observability
 
@@ -113,15 +121,23 @@ class MA_CTP_General(MultiAgentEnv):
         )
         graph_weights = self.stored_graphs[index, 0, :, :]
         graph_blocking_prob = self.stored_graphs[index, 1, :, :]
-        graph_origins = self.stored_graphs[index, 2, 0, :]
-        graph_goals = self.stored_graphs[index, 2, 1, :]
+
+        # origins and goals are one-hot encoded -> convert to int16 array of size num_nodes
+        _, graph_origins = jax.lax.top_k(
+            self.stored_graphs[index, 2, 0, :], self.num_agents
+        )
+        _, graph_goals = jax.lax.top_k(
+            self.stored_graphs[index, 2, 1, :], self.num_agents
+        )
+        graph_origins = jnp.array(graph_origins, dtype=jnp.int16)
+        graph_goals = jnp.array(graph_goals, dtype=jnp.int16)
 
         # Get solvable realisation. Add expensive edges as necessary
         blocking_status = graph_functions.sample_blocking_status(
             subkey, graph_blocking_prob
         )
 
-        blocking_status, graph_weights, graph_blocking_prob = add_expensive_edge(
+        graph_weights, graph_blocking_prob, blocking_status = add_expensive_edge(
             graph_weights,
             graph_blocking_prob,
             blocking_status,
@@ -129,12 +145,349 @@ class MA_CTP_General(MultiAgentEnv):
             graph_goals,
         )
         # If don't normalize using full observability, can normalize after adding expensive edge
+        # The operations performed for normalization using full observability = same as optimistic baseline
 
-        env_state = blocking_status
-        # return the initial belief state
-        original_observation = self.get_obs(env_state)
+        env_state = self.__convert_graph_realisation_to_state(
+            graph_origins,
+            graph_goals,
+            blocking_status,
+            graph_weights,
+            graph_blocking_prob,
+        )
+
+        # Get the initial belief states for all agents (first dimension corresponds to agent id)
+        initial_beliefs = jax.vmap(
+            lambda agent_id: self.get_initial_belief(env_state, agent_id)
+        )(jnp.arange(self.num_agents))
+
+        return env_state, initial_beliefs
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_obs(self, env_state: EnvState) -> jnp.ndarray:
-        # Returns observation for each agent
-        pass
+    def step(
+        self,
+        key: jax.random.PRNGKey,
+        current_env_state: EnvState,
+        current_belief_state: Belief_State,
+        actions: jnp.ndarray,
+    ) -> tuple[EnvState, Belief_State, int, bool]:
+        # Argument current_belief_state includes the belief state of all agents (first dimension corresponds to agent id)
+        # return the new environment state, next belief state, reward, and whether the episode is done
+        weights = current_env_state[1, self.num_agents :, :]
+        blocking_status = current_env_state[0, self.num_agents :, :]
+        # Which agent is servicing which goal
+        goal_service_agent = self._service_goal(
+            actions, current_env_state
+        )  # size num_nodes
+
+        # Get whether each agent is done -> will not incur negative rewards or move but belief state will change?
+        done_agents = jnp.where(
+            jnp.sum(current_env_state[3, : self.num_agents, :], axis=1) > 0,
+            jnp.bool_(True),
+            jnp.bool_(False),
+        )  # size num_agents
+
+        # Use environment state and action to determine if the action is valid for one agent
+        def _is_invalid_action(
+            action: int, current_env_state: jnp.array, agent_id: int
+        ) -> bool:
+            current_node_num = jnp.argmax(current_env_state[0, agent_id, :])
+            # Invalid if action is service goal but agent not listed for that goal (already includes the case where agent is not at goal)
+            invalid_service_action = jnp.logical_and(
+                action == self.num_nodes,
+                jnp.logical_not(goal_service_agent[current_node_num] == agent_id),
+            )
+            same_node_or_blocked_edges = jnp.logical_or(
+                action == current_node_num,
+                jnp.logical_or(
+                    weights[current_node_num, action] == CTP_generator.NOT_CONNECTED,
+                    blocking_status[current_node_num, action] == CTP_generator.BLOCKED,
+                ),
+            )
+            return jnp.logical_or(invalid_service_action, same_node_or_blocked_edges)
+
+        def _step_invalid_action(args) -> tuple[jnp.array, jnp.array, int, bool]:
+            # returns one row for agent pos, one row for goal servicing, reward, and whether that agent is done
+            current_env_state, actions, agent_id = args
+            reward = self.reward_for_invalid_action
+            agent_done = jnp.bool_(False)
+            return (
+                current_env_state[0, agent_id, :],
+                current_env_state[3, agent_id, :],
+                reward,
+                agent_done,
+            )
+
+        def _service_goal(args) -> tuple[jnp.array, jnp.array, int, bool]:
+            # agent already at goal -> don't need to update position
+            current_env_state, actions, agent_id = args
+            reward = self.reward_for_goal
+            # Update goal status
+            new_env_state = new_env_state.at[3, agent_id, actions[agent_id]].add(1)
+            agent_done = jnp.bool_(True)
+            return (
+                current_env_state[0, agent_id, :],
+                new_env_state[3, agent_id, :],
+                reward,
+                agent_done,
+            )
+
+        # Function that gets called if valid action and not servicing goal -> move to new node
+        def _move_to_new_node(args) -> tuple[jnp.array, jnp.array, int, bool]:
+            current_env_state, actions, agent_id = args
+            current_node = jnp.argmax(current_env_state[0, agent_id, :])
+            reward = -(weights[current_node, actions[agent_id]])
+            # update agent position
+            new_env_state = current_env_state.at[0, agent_id, actions[agent_id]].set(1)
+            agent_done = jnp.bool_(False)
+            return (
+                new_env_state[0, agent_id, :],
+                current_env_state[3, agent_id, :],
+                reward,
+                agent_done,
+            )
+
+        def _for_done_agents(args) -> tuple[jnp.array, jnp.array, int, bool]:
+            current_env_state, actions, agent_id = args
+            reward = 0
+            agent_done = jnp.bool_(True)
+            return (
+                current_env_state[0, agent_id, :],
+                current_env_state[3, agent_id, :],
+                reward,
+                agent_done,
+            )
+
+        def _update_per_agent(
+            current_env_state, actions, agent_id
+        ) -> tuple[jnp.array, int, bool]:
+            # Update agent pos, goal service status, reward, done
+            current_node = jnp.argmax(current_env_state[0, agent_id, :])
+            agent_pos, goal_service, reward, done = jax.lax.cond(
+                done_agents[agent_id] == jnp.bool_(True),
+                _for_done_agents(current_env_state, actions, agent_id),
+                jax.lax.cond(
+                    _is_invalid_action(actions[agent_id], current_env_state, agent_id),
+                    _step_invalid_action(current_env_state, actions, agent_id),
+                    jax.lax.cond(
+                        goal_service_agent[current_node] == agent_id,
+                        _service_goal(current_env_state, actions, agent_id),
+                        _move_to_new_node(current_env_state, actions, agent_id),
+                        operands=None,
+                    ),
+                    operands=None,
+                ),
+                operands=None,
+            )
+            return agent_pos, goal_service, reward, done
+
+        all_agents_pos, all_goals_service, rewards, all_agents_done = jax.vmap(
+            _update_per_agent, in_axes=(None, None, 0)
+        )(current_env_state, actions, jnp.arange(self.num_agents))
+
+        new_env_state = current_env_state.at[0, : self.num_agents, :].set(
+            all_agents_pos
+        )
+        new_env_state = new_env_state.at[3, : self.num_agents, :].set(all_goals_service)
+
+        # Get belief state for each agent based on new observations - vmap
+        # next_belief_states = jax.vmap(_get_belief_state_per_agent)()
+        # Get updated belief state from communication - vmap
+
+        # Add up rewards
+        total_reward = jnp.sum(rewards)
+
+        # Terminating the episode - if all agents are done
+        terminate = jnp.all(all_agents_done)
+        new_env_state, next_belief_states = jax.lax.cond(
+            terminate,
+            lambda x: self.reset(x),
+            lambda x: (new_env_state, next_belief_states),
+            key,
+        )
+        key, subkey = jax.random.split(key)
+        return new_env_state, next_belief_states, total_reward, terminate, subkey
+
+    # Get belief state based on observation. Belief state also has correct new agents' positions and goal status
+    @partial(jax.jit, static_argnums=(0,))
+    def _get_belief_state_per_agent(
+        self,
+        current_env_state: EnvState,
+        agent_id: int,
+        old_belief_state: Belief_State,
+    ) -> Belief_State:
+        agent_pos = current_env_state[0, agent_id, :]
+        blocking_status = current_env_state[0, self.num_agents :, :]
+        # Get edges connected to agent's current position
+        obs_blocking_status = jnp.full(
+            (
+                self.num_nodes,
+                self.num_nodes,
+            ),
+            CTP_generator.UNKNOWN,
+            dtype=jnp.float16,
+        )
+        # replace 1 row and column corresponding to agent's position. Observation
+        obs_blocking_status = obs_blocking_status.at[jnp.argmax(agent_pos), :].set(
+            blocking_status[jnp.argmax(agent_pos), :]
+        )
+        obs_blocking_status = obs_blocking_status.at[:, jnp.argmax(agent_pos)].set(
+            blocking_status[jnp.argmax(agent_pos), :]
+        )
+        # Combine current_blocking_status with new_observation
+        new_blocking_knowledge = jnp.where(
+            old_belief_state[0, self.num_agents :, :] == CTP_generator.UNKNOWN,
+            obs_blocking_status[self.num_agents :, :],
+            old_belief_state[0, self.num_agents :, :],
+        )
+
+        new_belief_state = current_env_state.at[0, self.num_agents :, :].set(
+            new_blocking_knowledge
+        )
+        return new_belief_state
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _update_belief_state_due_to_full_communication(
+        self, all_belief_states: jnp.ndarray, agent_id: int
+    ) -> Belief_State:
+        # currently will just return 1 scalar -> maybe vmap across rows and columns
+        blocked = jnp.any(
+            all_belief_states[:, 0, self.num_agents :, :] == CTP_generator.BLOCKED
+        )  # If any agent says BLOCKED, it's BLOCKED
+        unblocked = jnp.all(
+            all_belief_states[:, 0, self.num_agents :, :] == CTP_generator.UNBLOCKED
+        )  # If any agent says UNBLOCKED, it's UNBLOCKED
+        combined = jnp.where(
+            blocked,
+            CTP_generator.BLOCKED,
+            jnp.where(unblocked, CTP_generator.UNBLOCKED, CTP_generator.UNKNOWN),
+        )  # Apply priority logic
+
+    # Returns an array of size num_nodes. If the element is inf, that means it's not a goal.
+    # If -1, then no valid agent servicing that goal. If not -1 or inf then it's the index of the valid agent servicing the goal
+    @partial(jax.jit, static_argnums=(0,))
+    def _service_goal(
+        self, actions: jnp.ndarray, current_env_state: EnvState
+    ) -> jnp.array:
+        _, goals = jax.lax.top_k(
+            jnp.diag(current_env_state[3, self.num_agents :, :]), self.num_agents
+        )
+
+        # For each goal: check if any agent's pos is at the goal, the action is to service the goal, and the goal has not been serviced yet
+        def _find_agent_servicing_goal(index):
+            goal = goals[index]
+            not_serviced = not (
+                current_env_state[3, : self.num_agents, goal] == 0
+            ).all()
+            agents_servicing = actions == self.num_nodes
+            agents_at_goal = current_env_state[
+                0, self.num_agents :, goal
+            ]  # 1 if at goal. 0 otherwise
+            valid_agents = jnp.where(
+                jnp.logical_and(agents_servicing, agents_at_goal), 1, jnp.inf
+            )
+            smallest_agent = jnp.argmin(valid_agents)
+            final_smallest_agent = jnp.where(
+                jnp.logical_and(not_serviced, smallest_agent != jnp.inf),
+                smallest_agent,
+                -1,
+            )
+            return final_smallest_agent
+
+        goal_service_agent = jax.vmap(_find_agent_servicing_goal)(
+            jnp.arange(self.num_agents)
+        )
+
+        full_goal_service_agent = jnp.full((self.num_nodes,), jnp.inf, dtype=jnp.int16)
+        full_goal_service_agent = full_goal_service_agent.at[goals].set(
+            goal_service_agent
+        )
+
+        return goal_service_agent
+
+    @partial(jax.jit, static_argnums=(0,))
+    def __convert_graph_realisation_to_state(
+        self,
+        origins: jnp.array,
+        goals: int,
+        blocking_status: jnp.ndarray,
+        graph_weights: jnp.ndarray,
+        blocking_prob: jnp.ndarray,
+    ) -> EnvState:
+        agents_pos = jax.nn.one_hot(origins, self.num_nodes)
+        empty = jnp.zeros((self.num_agents, self.num_nodes), dtype=jnp.float16)
+        edge_weights = jnp.concatenate((empty, graph_weights), axis=0)
+        edge_probs = jnp.concatenate((empty, blocking_prob), axis=0)
+        pos_and_blocking_status = jnp.concatenate((agents_pos, blocking_status), axis=0)
+
+        # Top part is each agent's service history. Bottom part is number of times each goal needs to
+        # be serviced
+        goal_matrix = jnp.zeros((self.num_nodes, self.num_nodes), dtype=jnp.float16)
+        goal_matrix = jax.vmap(lambda goal: goal_matrix.at[goal, goal].set(1))(goals)
+        goal_matrix = jnp.sum(goal_matrix, axis=0, keepdims=False)
+        goal_matrix = jnp.concatenate((empty, goal_matrix), axis=0)
+
+        return jnp.stack(
+            (pos_and_blocking_status, edge_weights, edge_probs, goal_matrix),
+            axis=0,
+            dtype=jnp.float16,
+        )
+
+    # Returns the belief state for one agent
+    @partial(jax.jit, static_argnums=(0,))
+    def get_initial_belief(self, env_state: EnvState, agent_id) -> jnp.ndarray:
+        agent_pos = env_state[0, agent_id, :]
+        blocking_status = env_state[0, self.num_agents :, :]
+        # Get edges connected to agent's current position
+        obs_blocking_status = jnp.full(
+            (
+                self.num_nodes,
+                self.num_nodes,
+            ),
+            CTP_generator.UNKNOWN,
+            dtype=jnp.float16,
+        )
+        # replace 1 row and column corresponding to agent's position
+        obs_blocking_status = obs_blocking_status.at[jnp.argmax(agent_pos), :].set(
+            blocking_status[jnp.argmax(agent_pos), :]
+        )
+        obs_blocking_status = obs_blocking_status.at[:, jnp.argmax(agent_pos)].set(
+            blocking_status[jnp.argmax(agent_pos), :]
+        )
+
+        # Incorporate info that non-existent edges are blocked and deterministic edges are not blocked
+        blocking_status_knowledge = jnp.where(
+            jnp.logical_or(
+                env_state[2, self.num_agents :, :] == 0,
+                env_state[2, self.num_agents :, :] == 1,
+            ),
+            env_state[0, self.num_agents :, :],
+            obs_blocking_status[:, :],
+        )
+
+        # For the first matrix (blocking status)
+        all_agents_pos = jnp.zeros((self.num_agents, self.num_nodes), dtype=jnp.float16)
+        all_agents_pos = all_agents_pos.at[agent_id, :].set(agent_pos)
+        # Concatenate the agent's position and the blocking status knowledge
+        full_blocking_status_knowledge = jnp.concatenate(
+            (all_agents_pos, blocking_status_knowledge), axis=0
+        )
+
+        # Concatenate the other agents' positions and the blocking probabilities
+        other_agents_pos = env_state[0, : self.num_agents, :].at[agent_id, :].set(0)
+        full_blocking_prob = jnp.concatenate(
+            (other_agents_pos, env_state[1, self.num_agents :, :]), axis=0
+        )
+
+        # Stack everything
+        initial_belief_state = jnp.stack(
+            (
+                full_blocking_status_knowledge,
+                full_blocking_prob,
+                env_state[2, :, :],
+                env_state[3, :, :],
+            ),
+            axis=0,
+            dtype=jnp.float16,
+        )
+
+        return initial_belief_state
