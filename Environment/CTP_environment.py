@@ -79,14 +79,6 @@ class MA_CTP_General(MultiAgentEnv):
                     handcrafted_graph=None,
                 )
 
-                # Plot this for debugging purposes
-                current_directory = os.getcwd()
-                parent_dir = os.path.dirname(current_directory)
-                log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
-                graph_realisation.graph.plot_nx_graph(
-                    log_directory, "test_environment.png"
-                )
-
                 # Normalize the weights using the expected optimal path length under full observability
 
                 # Store the matrix of weights, blocking probs, and origin/goal
@@ -192,18 +184,23 @@ class MA_CTP_General(MultiAgentEnv):
         ) -> bool:
             current_node_num = jnp.argmax(current_env_state[0, agent_id, :])
             # Invalid if action is service goal but agent not listed for that goal (already includes the case where agent is not at goal)
-            invalid_service_action = jnp.logical_and(
+            is_invalid = jax.lax.cond(
                 action == self.num_nodes,
-                jnp.logical_not(goal_service_agent[current_node_num] == agent_id),
-            )
-            same_node_or_blocked_edges = jnp.logical_or(
-                action == current_node_num,
-                jnp.logical_or(
-                    weights[current_node_num, action] == CTP_generator.NOT_CONNECTED,
-                    blocking_status[current_node_num, action] == CTP_generator.BLOCKED,
+                lambda _: jnp.logical_not(
+                    goal_service_agent[current_node_num] == agent_id
                 ),
+                lambda _: jnp.logical_or(
+                    action == current_node_num,
+                    jnp.logical_or(
+                        weights[current_node_num, action]
+                        == CTP_generator.NOT_CONNECTED,
+                        blocking_status[current_node_num, action]
+                        == CTP_generator.BLOCKED,
+                    ),
+                ),
+                None,
             )
-            return jnp.logical_or(invalid_service_action, same_node_or_blocked_edges)
+            return is_invalid
 
         def _step_invalid_action(args) -> tuple[jnp.array, jnp.array, int, bool]:
             # returns one row for agent pos, one row for goal servicing, reward, and whether that agent is done
@@ -218,11 +215,13 @@ class MA_CTP_General(MultiAgentEnv):
             )
 
         def _service_goal(args) -> tuple[jnp.array, jnp.array, int, bool]:
+            # Returns agent_pos, goal service status, reward, and whether the agent is done
             # agent already at goal -> don't need to update position
             current_env_state, actions, agent_id = args
+            current_node_num = jnp.argmax(current_env_state[0, agent_id, :])
             reward = self.reward_for_goal
             # Update goal status
-            new_env_state = current_env_state.at[3, agent_id, actions[agent_id]].add(1)
+            new_env_state = current_env_state.at[3, agent_id, current_node_num].add(1)
             agent_done = jnp.bool_(True)
             return (
                 current_env_state[0, agent_id, :],
@@ -237,7 +236,8 @@ class MA_CTP_General(MultiAgentEnv):
             current_node = jnp.argmax(current_env_state[0, agent_id, :])
             reward = -(weights[current_node, actions[agent_id]])
             # update agent position
-            new_env_state = current_env_state.at[0, agent_id, actions[agent_id]].set(1)
+            new_env_state = current_env_state.at[0, agent_id, current_node].set(0)
+            new_env_state = new_env_state.at[0, agent_id, actions[agent_id]].set(1)
             agent_done = jnp.bool_(False)
             return (
                 new_env_state[0, agent_id, :],
@@ -290,6 +290,7 @@ class MA_CTP_General(MultiAgentEnv):
         new_env_state = new_env_state.at[3, : self.num_agents, :].set(all_goals_service)
 
         # Get belief state for each agent based on new observations, including the stationary agents that are done
+        # Also update the agents' positions and goal service status in the belief state
         next_belief_states = jax.vmap(
             self._get_belief_state_per_agent, in_axes=(None, 0, 0)
         )(new_env_state, jnp.arange(self.num_agents), current_belief_state)
@@ -355,6 +356,11 @@ class MA_CTP_General(MultiAgentEnv):
             current_env_state[0, : self.num_agents, :]
         )
         new_belief_state = new_belief_state.at[1, agent_id, :].set(0)
+
+        # Adjust goal service status
+        new_belief_state = new_belief_state.at[3, : self.num_agents, :].set(
+            current_env_state[3, : self.num_agents, :]
+        )
         return new_belief_state
 
     @partial(jax.jit, static_argnums=(0,))
@@ -405,28 +411,26 @@ class MA_CTP_General(MultiAgentEnv):
                 1,
                 jnp.iinfo(jnp.int16).max,
             )
-            smallest_agent = jnp.argmin(valid_agents)
+            smallest_agent = jnp.int16(jnp.argmin(valid_agents))
+            smallest_agent_value = jnp.min(valid_agents)
+
             final_smallest_agent = jnp.where(
                 jnp.logical_and(
-                    not_serviced, smallest_agent != jnp.iinfo(jnp.int16).max
+                    not_serviced, smallest_agent_value != jnp.iinfo(jnp.int16).max
                 ),
                 smallest_agent,
-                -1,
+                jnp.int16(-1),
             )
             return final_smallest_agent
 
         goal_service_agent = jax.vmap(_find_agent_servicing_goal)(
             jnp.arange(self.num_agents)
         )
-
-        full_goal_service_agent = jnp.full(
-            (self.num_nodes,), jnp.iinfo(jnp.int16).max, dtype=jnp.int16
-        )
+        full_goal_service_agent = jnp.full((self.num_nodes,), -1, dtype=jnp.int16)
         full_goal_service_agent = full_goal_service_agent.at[goals].set(
             goal_service_agent
         )
-
-        return goal_service_agent
+        return full_goal_service_agent
 
     @partial(jax.jit, static_argnums=(0,))
     def __convert_graph_realisation_to_state(
