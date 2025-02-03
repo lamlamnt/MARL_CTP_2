@@ -13,6 +13,7 @@ from tqdm import tqdm
 sys.path.append("..")
 from Utils import graph_functions
 from Utils.normalize_add_expensive_edge import add_expensive_edge
+from Utils.optimal_combination import get_optimal_combination_and_cost
 import os
 
 # size (4,num_agents+num_nodes,num_nodes)
@@ -136,8 +137,16 @@ class MA_CTP_General(MultiAgentEnv):
             graph_origins,
             graph_goals,
         )
-        # If don't normalize using full observability, can normalize after adding expensive edge
-        # The operations performed for normalization using full observability = same as optimistic baseline
+
+        # If don't normalize using full observability, can normalize here, after adding expensive edge
+        _, normalizing_factor = get_optimal_combination_and_cost(
+            graph_weights, blocking_status, graph_origins, graph_goals, self.num_agents
+        )
+        graph_weights = jnp.where(
+            graph_weights != CTP_generator.NOT_CONNECTED,
+            graph_weights / normalizing_factor,
+            CTP_generator.NOT_CONNECTED,
+        )
 
         env_state = self.__convert_graph_realisation_to_state(
             graph_origins,
@@ -161,9 +170,9 @@ class MA_CTP_General(MultiAgentEnv):
         current_env_state: EnvState,
         current_belief_state: Belief_State,
         actions: jnp.ndarray,
-    ) -> tuple[EnvState, Belief_State, int, bool]:
+    ) -> tuple[EnvState, Belief_State, jnp.array, jnp.array]:
         # Argument current_belief_state includes the belief state of all agents (first dimension corresponds to agent id)
-        # return the new environment state, next belief state, reward, and whether the episode is done
+        # return the new environment state, next belief state, array of indiviual reward, and boolean array
         weights = current_env_state[1, self.num_agents :, :]
         blocking_status = current_env_state[0, self.num_agents :, :]
         # Which agent is servicing which goal
@@ -300,10 +309,7 @@ class MA_CTP_General(MultiAgentEnv):
             self._update_belief_state_due_to_full_communication, in_axes=(None, 0)
         )(next_belief_states, jnp.arange(self.num_agents))
 
-        # Add up rewards
-        total_reward = jnp.sum(rewards)
-
-        # Terminating the episode - if all agents are done
+        # The episode is done if all agents are done
         terminate = jnp.all(all_agents_done)
         new_env_state, next_belief_states = jax.lax.cond(
             terminate,
@@ -312,7 +318,7 @@ class MA_CTP_General(MultiAgentEnv):
             key,
         )
         key, subkey = jax.random.split(key)
-        return new_env_state, next_belief_states, total_reward, terminate, subkey
+        return new_env_state, next_belief_states, rewards, all_agents_done, subkey
 
     # Get belief state based on observation. Belief state also has correct new agents' positions and goal status
     @partial(jax.jit, static_argnums=(0,))

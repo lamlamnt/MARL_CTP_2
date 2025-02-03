@@ -46,30 +46,33 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
     key, subkey = jax.random.split(key)
     initial_env_state, initial_belief_states = environment.reset(key)
     # take invalid action (same node)
-    env_state_1, belief_state_1, reward_1, terminate_1, subkey = environment.step(
+    env_state_1, belief_state_1, rewards_1, done_1, subkey = environment.step(
         subkey, initial_env_state, initial_belief_states, jnp.array([0, 1])
     )
 
     # take invalid action (not connected)
-    env_state_2, belief_state_2, reward_2, terminate_2, subkey = environment.step(
+    env_state_2, belief_state_2, rewards_2, done_2, subkey = environment.step(
         subkey, env_state_1, belief_state_1, jnp.array([4, 4])
     )
 
     # take invalid action (service goal while not at goal)
-    env_state_3, belief_state_3, reward_3, terminate_3, subkey = environment.step(
+    env_state_3, belief_state_3, rewards_3, done_3, subkey = environment.step(
         subkey, env_state_2, belief_state_2, jnp.array([5, 5])
     )
-    assert reward_1 == reward_2 == reward_3 < -300
+    assert jnp.array_equal(rewards_1, jnp.array([-200, -200]))
+    assert jnp.array_equal(rewards_2, jnp.array([-200, -200]))
+    assert jnp.array_equal(rewards_3, jnp.array([-200, -200]))
+    assert jnp.array_equal(done_3, jnp.array([False, False]))
     assert jnp.array_equal(env_state_1, env_state_2)
     assert jnp.array_equal(env_state_2, env_state_3)
     assert jnp.array_equal(belief_state_1, belief_state_2)
     assert jnp.array_equal(belief_state_2, belief_state_3)
 
     # Both agents at different goals
-    env_state_4, belief_state_4, reward_4, terminate_4, subkey = environment.step(
+    env_state_4, belief_state_4, rewards_4, done_4, subkey = environment.step(
         subkey, initial_env_state, initial_belief_states, jnp.array([2, 3])
     )
-    assert jnp.isclose(reward_4, -1.123, rtol=1e-3)
+    assert jnp.isclose(rewards_4, jnp.array([-0.1464, -0.854]), rtol=1e-3).all()
 
     # make sure positions are correct
     assert jnp.sum(env_state_4[0, :2, :]) == 2
@@ -79,19 +82,32 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
     assert jnp.sum(belief_state_4[1, 1, :2, :]) == 1
 
     # one agent services the goal. the other agent at the same goal
-    env_state_5, belief_state_5, reward_5, terminate_5, subkey = environment.step(
+    env_state_5, belief_state_5, rewards_5, done_5, subkey = environment.step(
         subkey, env_state_4, belief_state_4, jnp.array([5, 2])
     )
-    assert jnp.isclose(reward_5, -1, rtol=1e-3)
+    assert jnp.array_equal(done_5, jnp.array([True, False]))
+    assert jnp.isclose(rewards_5, jnp.array([0, -0.89]), rtol=1e-2).all()
     assert not jnp.array_equal(env_state_5[3, :, :], env_state_4[3, :, :])
     assert jnp.array_equal(env_state_5[3, :, :], belief_state_5[0, 3, :, :])
     assert jnp.array_equal(env_state_5[3, :, :], belief_state_5[1, 3, :, :])
 
+    # invalid action - servicing a goal that has already been serviced
+    (
+        env_state_invalid,
+        belief_state_invalid,
+        rewards_invalid,
+        done_invalid,
+        subkey,
+    ) = environment.step(subkey, env_state_5, belief_state_5, jnp.array([5, 5]))
+    assert jnp.array_equal(rewards_invalid, jnp.array([0, -200]))
+    assert jnp.array_equal(done_invalid, jnp.array([True, False]))
+
     # One agent done. The other agent goes to the goal
-    env_state_6, belief_state_6, reward_6, terminate_6, subkey = environment.step(
+    env_state_6, belief_state_6, rewards_6, done_6, subkey = environment.step(
         subkey, env_state_5, belief_state_5, jnp.array([0, 3])
     )
-    assert jnp.isclose(reward_6, -1, rtol=1e-3)
+    assert jnp.isclose(rewards_6, jnp.array([0, -0.89]), rtol=1e-2).all()
+    assert jnp.array_equal(done_6, jnp.array([True, False]))
 
     # check symmetrical
     assert jnp.all(
@@ -109,29 +125,40 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
     # check no more unknown blocking status in belief states
     assert jnp.all(belief_state_6[:, 0, :, :] != -1)
 
-    assert jnp.all(
-        jnp.array(
-            [
-                terminate_1,
-                terminate_2,
-                terminate_3,
-                terminate_4,
-                terminate_5,
-                terminate_6,
-            ]
-        )
-        == jnp.bool_(False)
-    )
-
     # both agents done
-    env_state_7, belief_state_7, reward_7, terminate_7, subkey = environment.step(
-        subkey, env_state_6, belief_state_6, jnp.array([0, 5])
+    env_state_7, belief_state_7, rewards_7, done_7, subkey = environment.step(
+        subkey, env_state_6, belief_state_6, jnp.array([5, 5])
     )
-    assert jnp.isclose(reward_7, 0, rtol=1e-3)
-    assert terminate_7 == jnp.bool_(True)
+    assert jnp.array_equal(rewards_7, jnp.array([0, 0]))
+    assert jnp.array_equal(done_7, jnp.array([True, True]))
 
     # check reset
     assert jnp.array_equal(env_state_7[3, :, :], initial_env_state[3, :, :])
+
+
+# when both agents service the same goal -> smaller index agent gets to service the goal. Invalid action for the other agent
+def test_same_goal(printer, environment: CTP_environment.MA_CTP_General):
+    key = jax.random.PRNGKey(31)
+    key, subkey = jax.random.split(key)
+    initial_env_state, initial_belief_states = environment.reset(key)
+    env_state_1, belief_state_1, rewards_1, done_1, subkey = environment.step(
+        subkey, initial_env_state, initial_belief_states, jnp.array([0, 0])
+    )
+    assert jnp.isclose(rewards_1, jnp.array([-200, -0.207]), rtol=1e-3).all()
+    env_state_2, belief_state_2, rewards_2, done_2, subkey = environment.step(
+        subkey, env_state_1, belief_state_1, jnp.array([2, 2])
+    )
+    assert jnp.array_equal(
+        env_state_2[0, :2, :], jnp.array([[0, 0, 1, 0, 0], [0, 0, 1, 0, 0]])
+    )
+    env_state_3, belief_state_3, rewards_3, done_3, subkey = environment.step(
+        subkey, env_state_2, belief_state_2, jnp.array([5, 5])
+    )
+    assert jnp.isclose(rewards_3, jnp.array([0, -200]), rtol=1e-2).all()
+    assert jnp.array_equal(done_3, jnp.array([True, False]))
+    assert jnp.array_equal(
+        env_state_3[0, :2, :], jnp.array([[0, 0, 1, 0, 0], [0, 0, 1, 0, 0]])
+    )
 
 
 # test single agent
@@ -165,8 +192,10 @@ def test_single_agent_working(printer):
         )
     )
     assert terminate_4 == jnp.bool_(True)
-    assert jnp.isclose(reward_4, 0, rtol=1e-3)
-    assert jnp.isclose(reward_1 + reward_2 + reward_3 + reward_4, -2.23, rtol=1e-2)
+    assert jnp.isclose(reward_4[0], 0, rtol=1e-3)
+    assert jnp.isclose(
+        reward_1[0] + reward_2[0] + reward_3[0] + reward_4[0], -1, rtol=1e-2
+    )
 
 
 # test generalizing environment
