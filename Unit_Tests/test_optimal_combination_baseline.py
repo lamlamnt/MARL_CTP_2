@@ -10,6 +10,7 @@ import pytest
 import pytest_print as pp
 import os
 import warnings
+from Agents.optimistic_agent import Optimistic_Agent
 
 
 @pytest.fixture
@@ -39,5 +40,16 @@ def test_get_optimal_combination_and_cost(
     assert jnp.array_equal(best_combination, jnp.array([0, 1]))
 
 
-def test_optimistic_agent(printer):
-    pass
+def test_optimistic_agent(printer, environment):
+    key = jax.random.PRNGKey(30)
+    initial_env_state, initial_belief_states = environment.reset(key)
+    optimistic_agent = Optimistic_Agent(2, 5)
+    pre_allocated_goals = optimistic_agent.allocate_goals(initial_belief_states[0])
+    printer(pre_allocated_goals)
+    printer(type(pre_allocated_goals))
+    """
+    actions = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
+        initial_belief_states, pre_allocated_goals, jnp.arange(2)
+    )
+    printer(actions)
+    """
