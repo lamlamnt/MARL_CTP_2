@@ -45,11 +45,10 @@ def test_optimistic_agent(printer, environment):
     initial_env_state, initial_belief_states = environment.reset(key)
     optimistic_agent = Optimistic_Agent(2, 5)
     pre_allocated_goals = optimistic_agent.allocate_goals(initial_belief_states[0])
-    printer(pre_allocated_goals)
-    printer(type(pre_allocated_goals))
-    """
+    assert jnp.array_equal(pre_allocated_goals, jnp.array([2, 3]))
     actions = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
         initial_belief_states, pre_allocated_goals, jnp.arange(2)
     )
+    assert jnp.array_equal(actions, jnp.array([2, 3]))
+    printer(initial_env_state)
     printer(actions)
-    """

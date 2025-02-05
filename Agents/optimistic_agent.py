@@ -21,6 +21,7 @@ class Optimistic_Agent:
     def allocate_goals(self, belief_state: jnp.ndarray) -> jnp.array:
         # use the first agent's belief state to allocate goals
         # allocate goals at the beginning of the episode
+        # returns the goals node number, not the index for the goals array
         # Assume all unknown stochastic edges are not blocked
         belief_state = belief_state.at[0, self.num_agents :, :].set(
             jnp.where(
@@ -43,14 +44,17 @@ class Optimistic_Agent:
         one_origin = jnp.argmax(belief_state[0, 0, :])
         other_origins = jnp.argmax(belief_state[1, self.num_agents :, :], axis=1)
         origins = other_origins.at[0].set(one_origin)
-        allocated_goals = get_optimal_combination_and_cost(
+        allocated_goals_indices, total_cost = get_optimal_combination_and_cost(
             belief_state[1, self.num_agents :, :],
             belief_state[0, self.num_agents :, :],
             origins,
             goals,
             self.num_agents,
-        )  # size num_agents
-        return allocated_goals
+        )  # size num_agents -> returns the index for the goal
+        _, goals = jax.lax.top_k(
+            jnp.diag(belief_state[3, self.num_agents :, :]), self.num_agents
+        )
+        return goals[allocated_goals_indices]
 
     # for one agent at a time (though if done together, would be slightly more efficient)
     @partial(jax.jit, static_argnums=(0))
@@ -87,7 +91,6 @@ class Optimistic_Agent:
         current_node = jnp.argmax(belief_state[0, agent_index, :])
         # If agent is done or at the goal corresponding to the allocated goal, then choose service action
         # Else, Dijkstra with path
-        pre_allocated_goals = jnp.asarray(pre_allocated_goals)
         action = jax.lax.cond(
             jnp.logical_or(
                 done, jnp.equal(current_node, pre_allocated_goals[agent_index])
@@ -95,7 +98,7 @@ class Optimistic_Agent:
             lambda x: self.num_nodes,
             lambda x: dijkstra_with_path(
                 belief_state, current_node, pre_allocated_goals[agent_index]
-            ),
+            )[1],
             None,
         )
         return action
