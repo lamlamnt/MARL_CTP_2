@@ -86,7 +86,7 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
         subkey, env_state_4, belief_state_4, jnp.array([5, 2])
     )
     assert jnp.array_equal(done_5, jnp.array([True, False]))
-    assert jnp.isclose(rewards_5, jnp.array([0, -0.89]), rtol=1e-2).all()
+    assert jnp.isclose(rewards_5, jnp.array([-0.1, -0.89]), rtol=1e-2).all()
     assert not jnp.array_equal(env_state_5[3, :, :], env_state_4[3, :, :])
     assert jnp.array_equal(env_state_5[3, :, :], belief_state_5[0, 3, :, :])
     assert jnp.array_equal(env_state_5[3, :, :], belief_state_5[1, 3, :, :])
@@ -129,7 +129,7 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
     env_state_7, belief_state_7, rewards_7, done_7, subkey = environment.step(
         subkey, env_state_6, belief_state_6, jnp.array([5, 5])
     )
-    assert jnp.array_equal(rewards_7, jnp.array([0, 0]))
+    assert jnp.isclose(rewards_7, jnp.array([0, -0.1], dtype=jnp.float16)).all()
     assert jnp.array_equal(done_7, jnp.array([True, True]))
 
     # check reset
@@ -154,7 +154,9 @@ def test_same_goal(printer, environment: CTP_environment.MA_CTP_General):
     env_state_3, belief_state_3, rewards_3, done_3, subkey = environment.step(
         subkey, env_state_2, belief_state_2, jnp.array([5, 5])
     )
-    assert jnp.isclose(rewards_3, jnp.array([0, -200]), rtol=1e-2).all()
+    assert jnp.isclose(
+        rewards_3, jnp.array([-0.1, -0.3], dtype=jnp.float16), rtol=1e-2
+    ).all()
     assert jnp.array_equal(done_3, jnp.array([True, False]))
     assert jnp.array_equal(
         env_state_3[0, :2, :], jnp.array([[0, 0, 1, 0, 0], [0, 0, 1, 0, 0]])
@@ -192,9 +194,9 @@ def test_single_agent_working(printer):
         )
     )
     assert terminate_4 == jnp.bool_(True)
-    assert jnp.isclose(reward_4[0], 0, rtol=1e-3)
+    assert jnp.isclose(reward_4[0], -0.1, rtol=1e-3)
     assert jnp.isclose(
-        reward_1[0] + reward_2[0] + reward_3[0] + reward_4[0], -1, rtol=1e-2
+        reward_1[0] + reward_2[0] + reward_3[0] + reward_4[0], -1.1, rtol=1e-2
     )
 
 

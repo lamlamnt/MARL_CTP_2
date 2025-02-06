@@ -33,7 +33,8 @@ class MA_CTP_General(MultiAgentEnv):
         k_edges=None,
         grid_size=None,
         reward_for_invalid_action=-200.0,
-        reward_for_goal=0,
+        reward_service_goal=-0.1,
+        reward_fail_to_service_goal_larger_index=-0.3,
         handcrafted_graph=None,
         num_stored_graphs=10,
         loaded_graphs=None,
@@ -43,7 +44,7 @@ class MA_CTP_General(MultiAgentEnv):
         num_agents: int
         num_nodes: int
         reward_for_invalid_action: int
-        reward_for_goal:int
+        reward_service_goal:int
         action_spaces
         graph_realisation: CTPGraph_Realisation
         num_stored_graphs: int # Number of stored graphs to choose from
@@ -51,7 +52,12 @@ class MA_CTP_General(MultiAgentEnv):
         super().__init__(num_agents=num_agents)
         self.num_agents = num_agents
         self.reward_for_invalid_action = jnp.float16(reward_for_invalid_action)
-        self.reward_for_goal = jnp.float16(reward_for_goal)
+        self.reward_service_goal = jnp.float16(
+            reward_service_goal
+        )  # Reward for servicing goal (maybe a small negative number)
+        self.reward_fail_to_service_goal_larger_index = jnp.float16(
+            reward_fail_to_service_goal_larger_index
+        )
         self.num_nodes = num_nodes
         self.num_stored_graphs = num_stored_graphs
 
@@ -214,7 +220,25 @@ class MA_CTP_General(MultiAgentEnv):
         def _step_invalid_action(args) -> tuple[jnp.array, jnp.array, int, bool]:
             # returns one row for agent pos, one row for goal servicing, reward, and whether that agent is done
             current_env_state, actions, agent_id = args
-            reward = self.reward_for_invalid_action
+            # different reward if invalid because failed to service the goal because a smaller index agent is servicing it
+            _, goals = jax.lax.top_k(
+                jnp.diag(current_env_state[3, self.num_agents :, :]), self.num_agents
+            )
+            current_node_num = jnp.argmax(current_env_state[0, agent_id, :])
+            not_serviced = (
+                current_env_state[3, : self.num_agents, current_node_num] == 0
+            ).all()
+            at_unserviced_goal = jnp.logical_and(
+                jnp.any(goals == current_node_num), not_serviced
+            )
+            reward = jax.lax.cond(
+                jnp.logical_and(
+                    actions[agent_id] == self.num_nodes, at_unserviced_goal
+                ),
+                lambda _: self.reward_fail_to_service_goal_larger_index,
+                lambda _: self.reward_for_invalid_action,
+                None,
+            )
             agent_done = jnp.bool_(False)
             return (
                 current_env_state[0, agent_id, :],
@@ -228,7 +252,7 @@ class MA_CTP_General(MultiAgentEnv):
             # agent already at goal -> don't need to update position
             current_env_state, actions, agent_id = args
             current_node_num = jnp.argmax(current_env_state[0, agent_id, :])
-            reward = self.reward_for_goal
+            reward = self.reward_service_goal
             # Update goal status
             new_env_state = current_env_state.at[3, agent_id, current_node_num].add(1)
             agent_done = jnp.bool_(True)

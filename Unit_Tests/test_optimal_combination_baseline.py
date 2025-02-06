@@ -50,5 +50,59 @@ def test_optimistic_agent(printer, environment):
         initial_belief_states, pre_allocated_goals, jnp.arange(2)
     )
     assert jnp.array_equal(actions, jnp.array([2, 3]))
-    printer(initial_env_state)
-    printer(actions)
+
+
+def test_optimistic_agent_2(printer):
+    key = jax.random.PRNGKey(50)
+    subkey1, subkey2 = jax.random.split(key)
+    environment = CTP_environment.MA_CTP_General(
+        2, 5, key, prop_stoch=0.8, grid_size=10, num_stored_graphs=1
+    )
+    initial_env_state, initial_belief_states = environment.reset(subkey1)
+    optimistic_agent = Optimistic_Agent(2, 5)
+    pre_allocated_goals = optimistic_agent.allocate_goals(initial_belief_states[0])
+    actions = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
+        initial_belief_states, pre_allocated_goals, jnp.arange(2)
+    )
+    assert jnp.array_equal(pre_allocated_goals, jnp.array([3, 2]))
+    assert jnp.array_equal(actions, jnp.array([3, 2]))
+
+
+def test_optimistic_agent_2(printer):
+    key = jax.random.PRNGKey(50)
+    subkey1, subkey = jax.random.split(key)
+    environment = CTP_environment.MA_CTP_General(
+        2, 10, key, prop_stoch=0.8, grid_size=10, num_stored_graphs=1
+    )
+    initial_env_state, initial_belief_states = environment.reset(subkey)
+    optimistic_agent = Optimistic_Agent(2, 10)
+    pre_allocated_goals = optimistic_agent.allocate_goals(initial_belief_states[0])
+    assert jnp.array_equal(pre_allocated_goals, jnp.array([7, 8]))
+    actions = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
+        initial_belief_states, pre_allocated_goals, jnp.arange(2)
+    )
+    assert jnp.array_equal(actions, jnp.array([7, 5]))
+    env_state_1, belief_state_1, rewards_1, done_1, subkey = environment.step(
+        subkey, initial_env_state, initial_belief_states, actions
+    )
+    actions_2 = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
+        belief_state_1, pre_allocated_goals, jnp.arange(2)
+    )
+    env_state_2, belief_state_2, rewards_2, done_2, subkey = environment.step(
+        subkey, env_state_1, belief_state_1, actions_2
+    )
+    assert jnp.array_equal(actions_2, jnp.array([10, 7]))
+    actions_3 = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
+        belief_state_2, pre_allocated_goals, jnp.arange(2)
+    )
+    env_state_3, belief_state_3, rewards_3, done_3, subkey = environment.step(
+        subkey, env_state_2, belief_state_2, actions_3
+    )
+    assert jnp.array_equal(actions_3, jnp.array([10, 8]))
+    actions_4 = jax.vmap(optimistic_agent.act, in_axes=(0, None, 0))(
+        belief_state_3, pre_allocated_goals, jnp.arange(2)
+    )
+    env_state_4, belief_state_4, rewards_4, done_4, subkey = environment.step(
+        subkey, env_state_3, belief_state_3, actions_4
+    )
+    assert jnp.array_equal(actions_4, jnp.array([10, 10]))

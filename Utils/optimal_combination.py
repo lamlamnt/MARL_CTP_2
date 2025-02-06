@@ -24,7 +24,7 @@ def get_optimal_combination_and_cost(
     # goals has size num_agents
 
     # Get the distance from each origin to each goal - vmap across origins. (n^2)
-    distances = jax.vmap(_dijkstra_shortest_path, in_axes=(None, None, None, 0))(
+    distances = jax.vmap(dijkstra_shortest_path, in_axes=(None, None, None, 0))(
         weights,
         blocking_status,
         origin_array,
@@ -48,7 +48,7 @@ def get_optimal_combination_and_cost(
 
 
 # Return distance from an origin to all other nodes
-def _dijkstra_shortest_path(
+def dijkstra_shortest_path(
     weights: jnp.ndarray,
     blocking_status: jnp.ndarray,
     origin_array: jnp.ndarray,
@@ -163,10 +163,6 @@ def dijkstra_with_path(
         path, current_node, index = jax.lax.while_loop(
             cond_fn, body_fn, (path, goal_node, 0)
         )
-
-        # If want to get the full path,
-        # path = jax.lax.slice(path,(0,),(index,))
-        # return path[::-1]
         return path[index - 2]
 
     next_node = get_next_node(goal, predecessors)
