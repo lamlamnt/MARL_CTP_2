@@ -1,0 +1,508 @@
+import os
+import jax
+import jax.numpy as jnp
+from Environment.CTP_environment import MA_CTP_General
+from Environment import CTP_generator
+from Networks.densenet import DenseNet_ActorCritic, DenseNet_ActorCritic_Same
+from Agents.ppo import PPO
+import argparse
+import optax
+from flax.training.train_state import TrainState
+from typing import Sequence, NamedTuple, Any
+import flax
+import time
+from datetime import datetime
+import json
+import numpy as np
+import wandb
+from distutils.util import strtobool
+from jax_tqdm import scan_tqdm
+import warnings
+import flax.linen as nn
+import sys
+import yaml
+from flax.core.frozen_dict import FrozenDict
+from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
+
+NUM_CHANNELS_IN_BELIEF_STATE = 6
+
+
+def main(args):
+    current_directory = os.getcwd()
+    log_directory = os.path.join(current_directory, "Logs", args.log_directory)
+    if not os.path.exists(log_directory):
+        os.makedirs(log_directory)
+    num_loops = args.time_steps // args.num_steps_before_update
+    if args.ent_coeff_schedule == "sigmoid_checkpoint":
+        assert num_loops < args.sigmoid_total_nums_all // args.num_steps_before_update
+        assert args.sigmoid_beginning_offset_num < args.sigmoid_total_nums_all
+
+    n_node = args.n_node
+
+    # Initialize and setting things up
+    print("Setting up the environment ...")
+    # Determine belief state shape
+    state_shape = (
+        NUM_CHANNELS_IN_BELIEF_STATE,
+        args.n_agent + n_node,
+        n_node,
+    )
+    key = jax.random.PRNGKey(args.random_seed_for_training)
+    subkeys = jax.random.split(key, num=2)
+    online_key, environment_key = subkeys
+
+    # Create the training environment
+    environment = MA_CTP_General(
+        args.n_agent,
+        n_node,
+        environment_key,
+        prop_stoch=args.prop_stoch,
+        k_edges=args.k_edges,
+        grid_size=n_node,
+        reward_for_invalid_action=args.reward_for_invalid_action,
+        reward_service_goal=args.reward_service_goal,
+        reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
+        num_stored_graphs=args.num_stored_graphs,
+        loaded_graphs=training_graphs,
+    )
+
+    # Create testing environment (for generalizing)
+    if args.network_type == "Densenet":
+        model = DenseNet_ActorCritic(
+            n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    else:
+        model = DenseNet_ActorCritic_Same(
+            n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    init_params = model.init(
+        jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
+    )
+    # Load in pre-trained network weights
+    if args.load_network_directory is not None:
+        network_file_path = os.path.join(
+            current_directory, "Logs", args.load_network_directory, "weights.flax"
+        )
+        with open(network_file_path, "rb") as f:
+            init_params = flax.serialization.from_bytes(init_params, f.read())
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(args.optimizer_norm_clip),
+        optax.adam(learning_rate=args.learning_rate, eps=1e-5),
+    )
+    train_state = TrainState.create(
+        apply_fn=model.apply,
+        params=init_params,
+        tx=optimizer,
+    )
+    init_key, env_action_key = jax.vmap(jax.random.PRNGKey)(
+        jnp.arange(2) + args.random_seed_for_training
+    )
+    agent = PPO(
+        model,
+        environment,
+        args.discount_factor,
+        args.gae_lambda,
+        args.clip_eps,
+        args.vf_coeff,
+        args.ent_coeff,
+        batch_size=args.num_steps_before_update,
+        num_minibatches=args.num_minibatches,
+        horizon_length=args.horizon_length_factor * n_node,
+        reward_exceed_horizon=args.reward_exceed_horizon,
+        num_loops=num_loops,
+        anneal_ent_coeff=args.anneal_ent_coeff,
+        deterministic_inference_policy=args.deterministic_inference_policy,
+        ent_coeff_schedule=args.ent_coeff_schedule,
+        sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
+        // args.num_steps_before_update,
+        sigmoid_total_nums_all=args.sigmoid_total_nums_all
+        // args.num_steps_before_update,
+        num_agents=args.n_agent,
+    )
+
+    # For the purpose of plotting the learning curve
+    arguments = FrozenDict(
+        {
+            "factor_testing_timesteps": args.factor_testing_timesteps,
+            "n_node": args.n_node,
+            "reward_exceed_horizon": args.reward_exceed_horizon,
+            "horizon_length_factor": args.horizon_length_factor,
+            "random_seed_for_inference": args.random_seed_for_inference,
+        }
+    )
+    print("Start training ...")
+
+    @scan_tqdm(num_loops)
+    def _update_step(runner_state, unused):
+        # Collect trajectories
+        runner_state, traj_batch = jax.lax.scan(
+            agent.env_step, runner_state, None, args.num_steps_before_update
+        )
+        # Calculate advantages
+        # timestep_in_episode is unused here
+        (
+            train_state,
+            new_env_state,
+            current_belief_states,
+            key,
+            timestep_in_episode,
+            loop_count,
+            previous_episode_done,
+        ) = runner_state
+        augmented_state = get_augmented_optimistic_pessimistic_belief(
+            current_belief_states
+        )
+        _, last_critic_val = model.apply(train_state.params, augmented_state)
+        advantages, targets = agent.calculate_gae(traj_batch, last_critic_val)
+        # advantages and targets are of shape (num_steps_before_update,)
+
+        # Update the network
+        update_state = (train_state, traj_batch, advantages, targets, key, loop_count)
+
+    start_training_time = time.time()
+    new_env_state, new_belief_states = environment.reset(init_key)
+    timestep_in_episode = jnp.int32(0)
+    loop_count = jnp.int32(0)
+    runner_state = (
+        train_state,
+        new_env_state,
+        new_belief_states,
+        env_action_key,
+        timestep_in_episode,
+        loop_count,
+        jnp.bool_(True),
+    )
+    """
+    runner_state, metrics = jax.lax.scan(
+        _update_step, runner_state, jnp.arange(num_loops)
+    )
+    """
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Parse command-line arguments for this unit test"
+    )
+    parser.add_argument(
+        "--n_node",
+        type=int,
+        help="Number of nodes in the graph",
+        required=True,
+    )
+    parser.add_argument(
+        "--n_agent",
+        type=int,
+        help="Number of agents in the environment",
+        required=False,
+        default=1,
+    )
+    parser.add_argument(
+        "--time_steps",
+        type=int,
+        help="Probably around num_episodes you want * num_nodes* 2",
+        required=False,
+        default=1000000,
+    )
+    parser.add_argument(
+        "--reward_for_invalid_action", type=float, required=False, default=-200.0
+    )
+    parser.add_argument(
+        "--reward_service_goal",
+        type=int,
+        help="Should be 0 or positive",
+        required=False,
+        default=-0.1,
+    )
+    parser.add_argument(
+        "--reward_fail_to_service_goal_larger_index",
+        type=float,
+        required=False,
+        default=-0.1,
+    )
+    parser.add_argument(
+        "--reward_exceed_horizon",
+        type=float,
+        help="Should be equal to or more negative than -1",
+        required=False,
+        default=-1.5,
+    )
+    parser.add_argument(
+        "--horizon_length_factor",
+        type=int,
+        help="Factor to multiply with number of nodes to get the maximum horizon length",
+        required=False,
+        default=2,
+    )
+    parser.add_argument(
+        "--prop_stoch",
+        type=float,
+        help="Proportion of edges that are stochastic. Only specify either prop_stoch or k_edges.",
+        required=False,
+        default=0.4,
+    )
+    parser.add_argument(
+        "--k_edges",
+        type=int,
+        help="Number of stochastic edges. Only specify either prop_stoch or k_edges",
+        required=False,
+        default=None,
+    )
+    parser.add_argument(
+        "--random_seed_for_training", type=int, required=False, default=100
+    )
+    parser.add_argument(
+        "--random_seed_for_inference", type=int, required=False, default=101
+    )
+    parser.add_argument("--discount_factor", type=float, required=False, default=1.0)
+    parser.add_argument("--learning_rate", type=float, required=False, default=0.001)
+    parser.add_argument(
+        "--num_update_epochs",
+        type=int,
+        help="After collecting trajectories, how many times each minibatch is updated.",
+        required=False,
+        default=6,
+    )
+    parser.add_argument(
+        "--network_type",
+        type=str,
+        required=False,
+        help="Options: Densenet,Densenet_Same",
+        default="Densenet_Same",
+    )
+    parser.add_argument("--densenet_bn_size", type=int, required=False, default=4)
+    parser.add_argument("--densenet_growth_rate", type=int, required=False, default=32)
+    parser.add_argument(
+        "--densenet_num_layers",
+        type=str,
+        required=False,
+        help="Num group of layers for each dense block in string format",
+        default="4,4,4",
+    )
+    parser.add_argument(
+        "--optimizer_norm_clip",
+        type=float,
+        required=False,
+        help="optimizer.clip_by_global_norm(value)",
+        default=0.5,
+    )
+
+    # Args related to running/managing experiments
+    parser.add_argument(
+        "--log_directory", type=str, help="Directory to store logs", required=True
+    )
+    parser.add_argument(
+        "--hand_crafted_graph",
+        type=str,
+        help="Options: None,diamond,n_stochastic. If anything other than None is specified, all other args relating to environment such as num of nodes are ignored.",
+        required=False,
+        default="None",
+    )
+    parser.add_argument(
+        "--wandb_mode",
+        type=str,
+        help="offline/online/disabled",
+        required=False,
+        default="disabled",
+    )
+    parser.add_argument(
+        "--wandb_project_name", type=str, required=False, default="no_name"
+    )
+    parser.add_argument(
+        "--yaml_file", type=str, required=False, default="sweep_config_node_10.yaml"
+    )
+    parser.add_argument(
+        "--wandb_sweep",
+        type=lambda x: bool(strtobool(x)),
+        default=False,
+        required=False,
+        help="Whether to use yaml file to do hyperparameter sweep (Bayesian optimization)",
+    )
+    parser.add_argument("--sweep_run_count", type=int, required=False, default=3)
+    parser.add_argument(
+        "--factor_inference_timesteps",
+        type=int,
+        required=False,
+        default=1000,
+        help="Number to multiply with the number of nodes to get the total number of inference timesteps",
+    )
+    parser.add_argument(
+        "--graph_mode",
+        type=str,
+        default="load",
+        required=False,
+        help="Options: generate,store,load",
+    )
+    parser.add_argument(
+        "--graph_identifier",
+        type=str,
+        required=False,
+        default="node_10_relabel_0.4",
+    )
+    parser.add_argument(
+        "--load_network_directory",
+        type=str,
+        default=None,
+        help="Directory to load trained network weights from",
+    )
+    parser.add_argument(
+        "--factor_testing_timesteps",
+        type=int,
+        required=False,
+        default=50,
+        help="Factor to multiple with number of nodes to get the number of timesteps to perform testing on during training (in order to plot the learning curve)",
+    )
+    parser.add_argument(
+        "--frequency_testing",
+        type=int,
+        required=False,
+        default=20,
+        help="How many updates before performing testing during training to plot the learning curve",
+    )
+    parser.add_argument(
+        "--learning_curve_average_window",
+        type=int,
+        default=5,
+        help="Number of points to average over for the smoothened learning curve plot",
+    )
+
+    # Args specific to PPO:
+    parser.add_argument(
+        "--num_steps_before_update",
+        type=int,
+        help="How many timesteps to collect before updating the network",
+        required=False,
+        default=1000,
+    )
+    parser.add_argument(
+        "--gae_lambda",
+        help="Control the trade-off between bias and variance in advantage estimates. High = Low bias, High variance as it depends on longer trajectories",
+        type=float,
+        required=False,
+        default=0.95,
+    )
+    parser.add_argument(
+        "--clip_eps",
+        help="Related to how big of an update can be made",
+        type=float,
+        required=False,
+        default=0.14,
+    )
+    parser.add_argument(
+        "--vf_coeff",
+        help="Contribution of the value loss to the total loss",
+        type=float,
+        required=False,
+        default=0.128,
+    )
+    parser.add_argument(
+        "--ent_coeff",
+        help="Exploration coefficient",
+        type=float,
+        required=False,
+        default=0.174,
+    )
+    parser.add_argument(
+        "--anneal_ent_coeff",
+        type=lambda x: bool(strtobool(x)),
+        required=False,
+        default=True,
+        help="Whether to anneal the entropy (exploration) coefficient",
+    )
+    parser.add_argument(
+        "--ent_coeff_schedule",
+        type=str,
+        required=False,
+        help="Options: sigmoid, sigmoid_checkpoint (for checkpoint training)",
+        default="sigmoid",
+    )
+    parser.add_argument(
+        "--num_minibatches",
+        help="Related to how the trajectory batch is split up for performing updating of the network",
+        type=int,
+        required=False,
+        default=1,
+    )
+    parser.add_argument(
+        "--deterministic_inference_policy",
+        type=lambda x: bool(strtobool(x)),
+        default=True,
+        required=False,
+        help="Whether to choose the action with the highest probability instead of sampling from the distribution",
+    )
+    parser.add_argument(
+        "--num_stored_graphs",
+        type=int,
+        required=False,
+        help="How many different graphs will be seen by the agent",
+        default=1,
+    )
+    parser.add_argument(
+        "--sigmoid_beginning_offset_num",
+        type=int,
+        required=False,
+        default=0,
+        help="For sigmoid ent coeff schedule checkpoint training. Unit: in number of timesteps. In the script, it will be divided by num_steps_before_update to convert to num_loops unit",
+    )
+    parser.add_argument(
+        "--sigmoid_total_nums_all",
+        type=int,
+        required=False,
+        default=10,
+        help="For sigmoid ent coeff schedule checkpoint training. Unit: in number of timesteps. In the script, it will be divided by num_steps_before_update to convert to num_loops unit",
+    )
+    args = parser.parse_args()
+    if args.graph_mode == "store":
+        raise ValueError("Not implemented yet")
+    elif args.graph_mode == "generate":
+        training_graphs = None
+        inference_graphs = None
+    else:
+        raise ValueError("Not implemented yet")
+    if args.wandb_sweep == False:
+        # Initialize wandb project
+        wandb.init(
+            project=args.wandb_project_name,
+            name=args.log_directory,
+            config=vars(args),
+            mode=args.wandb_mode,
+        )
+        main(args)
+        wandb.finish()
+    else:
+        # Hyperparameter sweep
+        print("Running hyperparameter sweep ...")
+        if args.wandb_mode != "online":
+            raise ValueError("Wandb mode must be online for hyperparameter sweep")
+        with open(args.yaml_file, "r") as file:
+            sweep_config = yaml.safe_load(file)
+        sweep_id = wandb.sweep(
+            sweep_config,
+            project=args.wandb_project_name,
+            entity="lam-lam-university-of-oxford",
+        )
+
+        def wrapper_function():
+            with wandb.init() as run:
+                config = run.config
+                # Don't need to name the run using config values (run.name = ...) because it will be very long
+                # Modify args based on config
+                for key in config:
+                    setattr(args, key, config[key])
+                # Instead of using run.id, can concatenate parameters
+                log_directory = os.path.join(
+                    os.getcwd(), "Logs", args.wandb_project_name, run.name
+                )
+                args.log_directory = log_directory
+                main(args)
+
+        wandb.agent(sweep_id, function=wrapper_function, count=args.sweep_run_count)
