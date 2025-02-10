@@ -162,12 +162,37 @@ def main(args):
         augmented_state = get_augmented_optimistic_pessimistic_belief(
             current_belief_states
         )
-        _, last_critic_val = model.apply(train_state.params, augmented_state)
+        # vmap over the agents
+        _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
+            train_state.params, augmented_state
+        )
         advantages, targets = agent.calculate_gae(traj_batch, last_critic_val)
-        # advantages and targets are of shape (num_steps_before_update,)
+        # advantages and targets are of shape (num_steps_before_update,num_agents)
 
         # Update the network
         update_state = (train_state, traj_batch, advantages, targets, key, loop_count)
+
+        rng = key  # delete this
+
+        loop_count += 1
+
+        runner_state = (
+            train_state,
+            new_env_state,
+            current_belief_states,
+            rng,
+            timestep_in_episode,
+            loop_count,
+            previous_episode_done,
+        )
+
+        # Collect metrics
+        metrics = {
+            "all_rewards": traj_batch.reward,
+            "all_done": traj_batch.done,
+            "all_optimal_path_lengths": traj_batch.shortest_path,
+        }
+        return runner_state, metrics
 
     start_training_time = time.time()
     new_env_state, new_belief_states = environment.reset(init_key)
@@ -182,11 +207,10 @@ def main(args):
         loop_count,
         jnp.bool_(True),
     )
-    """
     runner_state, metrics = jax.lax.scan(
         _update_step, runner_state, jnp.arange(num_loops)
     )
-    """
+    # runner_state, transition = agent.env_step(runner_state, None)
 
 
 if __name__ == "__main__":

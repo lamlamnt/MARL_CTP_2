@@ -11,6 +11,7 @@ from typing import Sequence, NamedTuple, Any
 from Environment.CTP_environment import MA_CTP_General
 from Environment import CTP_generator
 from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
+from Utils.optimal_combination import get_optimal_combination_and_cost
 
 
 class Transition(NamedTuple):
@@ -148,7 +149,7 @@ class PPO:
         )
         new_env_state, new_belief_states, rewards, dones, env_key = (
             self.environment.step(
-                env_key, current_env_state, augmented_belief_states, actions
+                env_key, current_env_state, current_belief_states, actions
             )
         )
         episode_done = jnp.all(dones)
@@ -159,13 +160,16 @@ class PPO:
         timestep_in_episode = jax.lax.cond(
             episode_done, lambda _: 0, lambda _: timestep_in_episode, operand=None
         )
+
         # Reset if exceed horizon length. Otherwise, increment
         new_env_state, new_belief_states, rewards, timestep_in_episode, dones = (
             jax.lax.cond(
                 timestep_in_episode >= self.horizon_length,
                 lambda _: (
                     *self.environment.reset(reset_key),
-                    self.reward_exceed_horizon,
+                    jnp.full(
+                        self.num_agents, self.reward_exceed_horizon, dtype=jnp.float16
+                    ),
                     0,
                     jnp.full(self.num_agents, True, dtype=bool),
                 ),
@@ -181,7 +185,27 @@ class PPO:
         )
 
         # Calculate shortest total cost at the beginning of the episode. But we don't need this for training
-        shortest_path = 1
+        def _calculate_optimal_cost(env_state):
+            _, goals = jax.lax.top_k(
+                jnp.diag(env_state[3, self.num_agents :, :]), self.num_agents
+            )
+            origins = jnp.argmax(env_state[0, : self.num_agents, :], axis=1)
+            _, optimal_cost = get_optimal_combination_and_cost(
+                env_state[1, self.num_agents :, :],
+                env_state[0, self.num_agents :, :],
+                origins,
+                goals,
+                self.num_agents,
+            )
+            return jnp.array(optimal_cost, dtype=jnp.float16)
+
+        # This adds to the compilation time a lot
+        shortest_path = jax.lax.cond(
+            previous_episode_dones,
+            _calculate_optimal_cost,
+            lambda _: jnp.array(0.0, dtype=jnp.float16),
+            operand=current_env_state,
+        )
 
         runner_state = (
             train_state,
@@ -190,7 +214,7 @@ class PPO:
             env_key,
             timestep_in_episode,
             loop_count,
-            dones,
+            episode_done,
         )
 
         # Keep all agents' transitions in for now
@@ -221,6 +245,8 @@ class PPO:
                 transition.critic_value,
                 transition.reward,
             )
+            team_reward = jnp.sum(reward, axis=0)
+            print(team_reward.shape)
             delta = (
                 reward + self.discount_factor * next_value * (1 - done) - critic_value
             )
@@ -238,4 +264,15 @@ class PPO:
         return advantages, advantages + traj_batch.critic_value
 
     def _loss_fn(self, params, traj_batch: Transition, gae, targets, ent_coeff):
+        # RERUN NETWORK
+        traj_batch_augmented_belief_state = jax.vmap(
+            get_augmented_optimistic_pessimistic_belief
+        )(traj_batch.belief_state)
+        # vmap over agents and over timesteps
+        pi, value = jax.vmap(self.model.apply, in_axes=(None, 0))(
+            params, traj_batch_augmented_belief_state
+        )
+
+    @partial(jax.jit, static_argnums=(0,))
+    def _update_epoch(self, update_state, unused):
         pass
