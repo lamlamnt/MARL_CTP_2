@@ -183,6 +183,7 @@ class PPO:
                 operand=None,
             )
         )
+        episode_done = jnp.all(dones)
 
         # Calculate shortest total cost at the beginning of the episode. But we don't need this for training
         # The only reason it's included it is to calculate the competitive ratio

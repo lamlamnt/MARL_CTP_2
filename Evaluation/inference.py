@@ -116,6 +116,8 @@ def plotting_inference(
                 operand=None,
             )
         )
+        # Need this line again because reset episode if exceed horizon length (dones might have been changed due to exceeding horizon length)
+        episode_done = jnp.all(dones)
 
         # Calculate shortest total cost at the beginning of the episode. But we don't need this for training
         def _calculate_optimal_cost(env_state):

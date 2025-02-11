@@ -61,7 +61,7 @@ def save_data_and_plotting(
             data={
                 "episode": all_episode_done.cumsum(),
                 "reward": all_total_rewards,
-                "optimal_path_length": all_optimal_costs,
+                "optimal_cost": all_optimal_costs,
             },
         )
         df["episode"] = df["episode"].shift().fillna(0)
@@ -69,7 +69,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 2, "optimal_path_length": 2})
+            .round({"reward": 2, "optimal_cost": 2})
         )
     else:
         # For inference, get the additional optimistic baseline
@@ -77,7 +77,7 @@ def save_data_and_plotting(
             data={
                 "episode": all_episode_done.cumsum(),
                 "reward": all_total_rewards,
-                "optimal_path_length": all_optimal_costs,
+                "optimal_cost": all_optimal_costs,
                 "optimistic_baseline": all_optimistic_baseline,
             },
         )
@@ -86,17 +86,15 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 2, "optimal_path_length": 2, "optimistic_baseline": 2})
+            .round({"reward": 2, "optimal_cost": 2, "optimistic_baseline": 2})
         )
         episodes_df["competitive_ratio_optimistic_baseline"] = (
-            episodes_df["optimistic_baseline"] / episodes_df["optimal_path_length"]
+            episodes_df["optimistic_baseline"] / episodes_df["optimal_cost"]
         )
     episodes_df = episodes_df.iloc[:-1]
-    episodes_df["regret"] = (
-        episodes_df["reward"].abs() - episodes_df["optimal_path_length"]
-    )
+    episodes_df["regret"] = episodes_df["reward"].abs() - episodes_df["optimal_cost"]
     episodes_df["competitive_ratio"] = (
-        episodes_df["reward"].abs() / episodes_df["optimal_path_length"]
+        episodes_df["reward"].abs() / episodes_df["optimal_cost"]
     )
     if episodes_df.shape[0] < 1000000:
         episodes_df.to_excel(
@@ -133,8 +131,7 @@ def save_data_and_plotting(
         )
         filtered_episodes_df = filtered_episodes_df.iloc[:-1]
         filtered_episodes_df["competitive_ratio"] = (
-            filtered_episodes_df["reward"].abs()
-            / filtered_episodes_df["optimal_path_length"]
+            filtered_episodes_df["reward"].abs() / filtered_episodes_df["optimal_cost"]
         )
         num_reach_horizon = np.sum(
             np.isclose(all_total_rewards, reward_exceed_horizon, atol=0.1)

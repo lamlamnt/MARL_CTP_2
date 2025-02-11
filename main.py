@@ -25,6 +25,7 @@ from flax.core.frozen_dict import FrozenDict
 from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
 from Evaluation.inference import plotting_inference
 from Evaluation.inference_during_training import get_average_testing_stats
+from Utils.load_store_graphs import load_graphs, store_graphs
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -498,7 +499,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--deterministic_inference_policy",
         type=lambda x: bool(strtobool(x)),
-        default=False,
+        default=True,
         required=False,
         help="Whether to choose the action with the highest probability instead of sampling from the distribution",
     )
@@ -525,12 +526,19 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if args.graph_mode == "store":
-        raise ValueError("Not implemented yet")
+        print("Generating graphs for storage ...")
+        store_graphs(args)
+        sys.exit(0)
     elif args.graph_mode == "generate":
         training_graphs = None
         inference_graphs = None
     else:
-        raise ValueError("Not implemented yet")
+        # Load
+        print("Checking validity and loading graphs ...")
+        # Check args match and load graphs
+        training_graphs, inference_graphs, num_training_graphs, num_inference_graphs = (
+            load_graphs(args)
+        )
     if args.wandb_sweep == False:
         # Initialize wandb project
         wandb.init(
