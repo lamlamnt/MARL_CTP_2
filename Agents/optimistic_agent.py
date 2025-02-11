@@ -102,3 +102,42 @@ class Optimistic_Agent:
             None,
         )
         return action
+
+    @partial(jax.jit, static_argnums=(0, 1))
+    def get_total_cost(
+        self,
+        environment: CTP_environment.MA_CTP_General,
+        initial_belief_states: jnp.ndarray,
+        initial_env_state: jnp.ndarray,
+        env_key: jax.random.PRNGKey,
+    ):
+        pre_allocated_goals = self.allocate_goals(initial_belief_states[0])
+
+        def cond_fn(carry):
+            _, _, _, episode_done, _ = carry
+            return ~episode_done  # Continue while not done
+
+        # returns a positive float
+        def body_fn(carry):
+            env_state, belief_states, total_cost, episode_done, env_key = carry
+            actions = jax.vmap(self.act, in_axes=(0, None, 0))(
+                belief_states, pre_allocated_goals, jnp.arange(self.num_agents)
+            )
+            env_state, belief_states, rewards, dones, env_key = environment.step(
+                env_key, env_state, belief_states, actions
+            )
+            total_cost += -jnp.sum(rewards)
+            episode_done = jnp.all(dones)
+            return env_state, belief_states, total_cost, episode_done, env_key
+
+        total_cost = 0.0
+        carry = (
+            initial_env_state,
+            initial_belief_states,
+            total_cost,
+            False,
+            env_key,
+        )
+        final_carry = jax.lax.while_loop(cond_fn, body_fn, carry)
+        total_cost = final_carry[2]
+        return total_cost

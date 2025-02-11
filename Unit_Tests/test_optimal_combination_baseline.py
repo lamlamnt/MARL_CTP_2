@@ -106,3 +106,15 @@ def test_optimistic_agent_2(printer):
         subkey, env_state_3, belief_state_3, actions_4
     )
     assert jnp.array_equal(actions_4, jnp.array([10, 10]))
+
+
+def test_optimistic_agent_full_episode(
+    printer, environment: CTP_environment.MA_CTP_General
+):
+    key = jax.random.PRNGKey(30)
+    initial_env_state, initial_belief_states = environment.reset(key)
+    optimistic_agent = Optimistic_Agent(2, 5)
+    total_cost = optimistic_agent.get_total_cost(
+        environment, initial_belief_states, initial_env_state, key
+    )
+    assert jnp.isclose(total_cost, 1.2, rtol=1e-2)

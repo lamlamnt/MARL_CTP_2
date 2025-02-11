@@ -23,6 +23,7 @@ import sys
 import yaml
 from flax.core.frozen_dict import FrozenDict
 from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
+from Evaluation.inference import plotting_inference
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -128,6 +129,7 @@ def main(args):
         sigmoid_total_nums_all=args.sigmoid_total_nums_all
         // args.num_steps_before_update,
         num_agents=args.n_agent,
+        reward_service_goal=args.reward_service_goal,
     )
 
     # For the purpose of plotting the learning curve
@@ -171,8 +173,11 @@ def main(args):
 
         # Update the network
         update_state = (train_state, traj_batch, advantages, targets, key, loop_count)
-
-        rng = key  # delete this
+        update_state, total_loss = jax.lax.scan(
+            agent._update_epoch, update_state, None, args.num_update_epochs
+        )
+        train_state = update_state[0]
+        rng = update_state[-2]
 
         loop_count += 1
 
@@ -188,9 +193,12 @@ def main(args):
 
         # Collect metrics
         metrics = {
-            "all_rewards": traj_batch.reward,
-            "all_done": traj_batch.done,
-            "all_optimal_path_lengths": traj_batch.shortest_path,
+            "losses": total_loss,
+            "all_total_rewards": jnp.sum(
+                traj_batch.reward, axis=1
+            ),  # doing this results in all_rewards with shape (num_timesteps,)
+            "all_episode_done": jnp.all(traj_batch.done, axis=1),
+            "all_optimal_costs": traj_batch.shortest_path,
         }
         return runner_state, metrics
 
@@ -210,7 +218,23 @@ def main(args):
     runner_state, metrics = jax.lax.scan(
         _update_step, runner_state, jnp.arange(num_loops)
     )
-    # runner_state, transition = agent.env_step(runner_state, None)
+    train_state = runner_state[0]
+    # Metrics will be stacked. Get episode done from all_done and total rewards from all_rewards
+    out = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (-1,)), metrics)
+
+    # Create the testing environment
+    testing_environment = environment
+
+    plotting_inference(
+        log_directory,
+        start_training_time,
+        train_state.params,
+        out,
+        testing_environment,
+        agent,
+        args,
+        n_node,
+    )
 
 
 if __name__ == "__main__":
@@ -459,7 +483,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--deterministic_inference_policy",
         type=lambda x: bool(strtobool(x)),
-        default=True,
+        default=False,
         required=False,
         help="Whether to choose the action with the highest probability instead of sampling from the distribution",
     )
@@ -481,7 +505,7 @@ if __name__ == "__main__":
         "--sigmoid_total_nums_all",
         type=int,
         required=False,
-        default=10,
+        default=10000,
         help="For sigmoid ent coeff schedule checkpoint training. Unit: in number of timesteps. In the script, it will be divided by num_steps_before_update to convert to num_loops unit",
     )
     args = parser.parse_args()

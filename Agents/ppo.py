@@ -45,6 +45,7 @@ class PPO:
         sigmoid_beginning_offset_num: int,
         sigmoid_total_nums_all: int,
         num_agents: int,
+        reward_service_goal: float,
     ) -> None:
         self.model = model
         self.environment = environment
@@ -64,6 +65,7 @@ class PPO:
         self.sigmoid_beginning_offset_num = sigmoid_beginning_offset_num
         self.sigmoid_total_nums_all = sigmoid_total_nums_all
         self.num_agents = num_agents
+        self.reward_service_goal = jnp.float16(reward_service_goal)
 
     def _ent_coeff_schedule(self, loop_count):
         # linear or sigmoid or plateau schedule
@@ -90,9 +92,7 @@ class PPO:
 
     # return the actions for all agents
     @partial(jax.jit, static_argnums=(0,))
-    def act(
-        self, key, params, belief_states, unused
-    ) -> tuple[jnp.array, jax.random.PRNGKey]:
+    def act(self, key, params, belief_states) -> tuple[jnp.array, jax.random.PRNGKey]:
         augmented_belief_states = get_augmented_optimistic_pessimistic_belief(
             belief_states
         )
@@ -185,6 +185,7 @@ class PPO:
         )
 
         # Calculate shortest total cost at the beginning of the episode. But we don't need this for training
+        # The only reason it's included it is to calculate the competitive ratio
         def _calculate_optimal_cost(env_state):
             _, goals = jax.lax.top_k(
                 jnp.diag(env_state[3, self.num_agents :, :]), self.num_agents
@@ -197,7 +198,12 @@ class PPO:
                 goals,
                 self.num_agents,
             )
-            return jnp.array(optimal_cost, dtype=jnp.float16)
+            optimal_cost_including_service_goal_costs = (
+                optimal_cost + self.reward_service_goal * self.num_agents
+            )
+            return jnp.array(
+                optimal_cost_including_service_goal_costs, dtype=jnp.float16
+            )
 
         # This adds to the compilation time a lot
         shortest_path = jax.lax.cond(
@@ -246,7 +252,6 @@ class PPO:
                 transition.reward,
             )
             team_reward = jnp.sum(reward, axis=0)
-            print(team_reward.shape)
             delta = (
                 reward + self.discount_factor * next_value * (1 - done) - critic_value
             )
@@ -269,10 +274,82 @@ class PPO:
             get_augmented_optimistic_pessimistic_belief
         )(traj_batch.belief_state)
         # vmap over agents and over timesteps
-        pi, value = jax.vmap(self.model.apply, in_axes=(None, 0))(
-            params, traj_batch_augmented_belief_state
+        pi, value = jax.vmap(
+            jax.vmap(self.model.apply, in_axes=(None, 0)), in_axes=(None, 0)
+        )(params, traj_batch_augmented_belief_state)
+        # value has shape (num_steps_before_update, num_agents)
+        log_prob = pi.log_prob(traj_batch.action)
+
+        # CALCULATE VALUE LOSS
+        value_pred_clipped = traj_batch.critic_value + (
+            value - traj_batch.critic_value
+        ).clip(-self.clip_eps, self.clip_eps)
+        value_losses = jnp.square(value - targets)
+        value_losses_clipped = jnp.square(value_pred_clipped - targets)
+        # value_losses_clipped has shape (num_steps_before_update, num_agents). And then after this line below,
+        # value loss is a scalar (mean over all agents and all timesteps)
+        value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+
+        # CALCULATE ACTOR LOSS
+        ratio = jnp.exp(log_prob - traj_batch.log_prob)
+        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+        loss_actor1 = ratio * gae
+        loss_actor2 = (
+            jnp.clip(
+                ratio,
+                1.0 - self.clip_eps,
+                1.0 + self.clip_eps,
+            )
+            * gae
         )
+        loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
+        loss_actor = loss_actor.mean()
+        entropy = pi.entropy().mean()
+
+        total_loss = loss_actor + self.vf_coeff * value_loss - ent_coeff * entropy
+        return total_loss, (value_loss, loss_actor, entropy)
 
     @partial(jax.jit, static_argnums=(0,))
     def _update_epoch(self, update_state, unused):
-        pass
+        train_state, traj_batch, advantages, targets, rng, loop_count = update_state
+        rng, _rng = jax.random.split(rng)
+        permutation = jax.random.permutation(_rng, self.batch_size)
+        batch = (
+            traj_batch,
+            advantages,
+            targets,
+        )  # advantages and targets have shape (num_steps_before_update, num_agents)
+        batch = jax.tree_util.tree_map(
+            lambda x: x.reshape((self.batch_size,) + x.shape[1:]), batch
+        )
+        shuffled_batch = jax.tree_util.tree_map(
+            lambda x: jnp.take(x, permutation, axis=0), batch
+        )
+
+        def _update_minbatch(train_state, batch_info):
+            traj_batch, advantages, targets = batch_info
+            train_state, traj_batch, advantages, targets, rng, loop_count = update_state
+            ent_coeff = jax.lax.cond(
+                self.anneal_ent_coeff,
+                lambda _: self._ent_coeff_schedule(loop_count),
+                lambda _: self.ent_coeff,
+                operand=None,
+            )
+            rng, _rng = jax.random.split(rng)
+            grad_fn = jax.value_and_grad(self._loss_fn, has_aux=True)
+            total_loss, grads = grad_fn(
+                train_state.params, traj_batch, advantages, targets, ent_coeff
+            )
+            train_state = train_state.apply_gradients(grads=grads)
+            return train_state, total_loss
+
+        # Mini-batch Updates
+        minibatches = jax.tree_util.tree_map(
+            lambda x: jnp.reshape(x, [self.num_minibatches, -1] + list(x.shape[1:])),
+            shuffled_batch,
+        )
+        train_state, total_loss = jax.lax.scan(
+            _update_minbatch, train_state, minibatches
+        )
+        update_state = (train_state, traj_batch, advantages, targets, rng, loop_count)
+        return update_state, total_loss

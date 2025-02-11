@@ -9,6 +9,7 @@ import pytest
 import pytest_print as pp
 import os
 import warnings
+import numpy as np
 
 
 @pytest.fixture
@@ -20,5 +21,4 @@ def environment():
     return environment
 
 
-def test_env_step(environment: CTP_environment.MA_CTP_General):
-    pass
+# def test_env_step(environment: CTP_environment.MA_CTP_General):
