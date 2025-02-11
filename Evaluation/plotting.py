@@ -3,6 +3,43 @@ import pandas as pd
 import os
 import numpy as np
 import wandb
+import jax.numpy as jnp
+
+
+def plot_learning_curve(testing_average_competitive_ratio, log_directory, args):
+    learning_curve_values = testing_average_competitive_ratio[
+        testing_average_competitive_ratio != 0
+    ]
+    # Plot rolling average (mean and std) of competitive ratio
+    learning_curve_series = pd.Series(learning_curve_values)
+    rolling_mean = learning_curve_series.rolling(
+        window=args.learning_curve_average_window, min_periods=1
+    ).mean()
+    rolling_std = learning_curve_series.rolling(
+        window=args.learning_curve_average_window, min_periods=1
+    ).std()
+    plt.figure(figsize=(10, 6))
+    plt.plot(
+        args.num_steps_before_update
+        * args.frequency_testing
+        * jnp.arange(len(learning_curve_values)),
+        rolling_mean,
+        linestyle="-",
+        color="red",
+    )
+    plt.fill_between(
+        args.num_steps_before_update
+        * args.frequency_testing
+        * jnp.arange(len(learning_curve_values)),
+        rolling_mean - rolling_std,
+        rolling_mean + rolling_std,
+        color="blue",
+        alpha=0.2,
+    )
+    plt.title("Learning Curve with Rolling Average")
+    plt.xlabel("Training Timesteps")
+    plt.ylabel("Average Competitive Ratio")
+    plt.savefig(os.path.join(log_directory, "Smoothened_Learning_Curve.png"))
 
 
 def save_data_and_plotting(
@@ -11,6 +48,7 @@ def save_data_and_plotting(
     all_optimal_costs,
     directory,
     reward_exceed_horizon,
+    num_agents,
     all_optimistic_baseline=None,
     training=True,
 ) -> dict[str, float]:
@@ -31,7 +69,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 3, "optimal_path_length": 3})
+            .round({"reward": 2, "optimal_path_length": 2})
         )
     else:
         # For inference, get the additional optimistic baseline
@@ -48,7 +86,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 3, "optimal_path_length": 3, "optimistic_baseline": 3})
+            .round({"reward": 2, "optimal_path_length": 2, "optimistic_baseline": 2})
         )
         episodes_df["competitive_ratio_optimistic_baseline"] = (
             episodes_df["optimistic_baseline"] / episodes_df["optimal_path_length"]
@@ -88,7 +126,7 @@ def save_data_and_plotting(
     # Get the mean competitive ratio excluding the failed episodes
     if training == False:
         filtered_df = df.groupby("episode").filter(
-            lambda group: (group["reward"] != -1.5).all()
+            lambda group: (group["reward"] != reward_exceed_horizon * num_agents).all()
         )
         filtered_episodes_df = (
             filtered_df.groupby("episode").agg("sum").astype(np.float32)

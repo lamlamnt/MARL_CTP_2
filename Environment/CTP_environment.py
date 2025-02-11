@@ -86,14 +86,6 @@ class MA_CTP_General(MultiAgentEnv):
                     handcrafted_graph=None,
                 )
 
-                # Remove this when done debugging
-                if num_stored_graphs == 1:
-                    current_directory = os.getcwd()
-                    log_directory = os.path.join(
-                        current_directory, "Logs", "check_code"
-                    )
-                    graph_realisation.graph.plot_nx_graph(log_directory)
-
                 # Normalize the weights using the expected optimal path length under full observability
 
                 # Store the matrix of weights, blocking probs, and origin/goal

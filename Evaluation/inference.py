@@ -14,7 +14,7 @@ sys.path.append("..")
 from Environment.CTP_environment import MA_CTP_General
 from Agents.optimistic_agent import Optimistic_Agent
 from Utils.optimal_combination import get_optimal_combination_and_cost
-from Evaluation.plotting import save_data_and_plotting
+from Evaluation.plotting import save_data_and_plotting, plot_learning_curve
 
 
 # Get layer name and weights from FLAX params
@@ -54,10 +54,12 @@ def plotting_inference(
         out["all_optimal_costs"],
         log_directory,
         reward_exceed_horizon=args.reward_exceed_horizon,
+        num_agents=args.n_agent,
         training=True,
     )
 
     # Plot learning curve
+    plot_learning_curve(out["testing_average_competitive_ratio"], log_directory, args)
 
     # Evaluate the model
     print("Start evaluating ...")
@@ -128,8 +130,9 @@ def plotting_inference(
                 goals,
                 args.n_agent,
             )
+            # minus self.reward_service goal because this is a positive number
             optimal_cost_including_service_goal_costs = (
-                optimal_cost + args.reward_service_goal * args.n_agent
+                optimal_cost - args.reward_service_goal * args.n_agent
             )
             return jnp.array(
                 optimal_cost_including_service_goal_costs, dtype=jnp.float16
@@ -187,6 +190,7 @@ def plotting_inference(
         test_all_optimal_cost,
         log_directory,
         reward_exceed_horizon=args.reward_exceed_horizon,
+        num_agents=args.n_agent,
         all_optimistic_baseline=test_optimistic_baseline,
         training=False,
     )

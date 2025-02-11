@@ -198,8 +198,9 @@ class PPO:
                 goals,
                 self.num_agents,
             )
+            # minus self.reward_service goal because this is a positive number
             optimal_cost_including_service_goal_costs = (
-                optimal_cost + self.reward_service_goal * self.num_agents
+                optimal_cost - self.reward_service_goal * self.num_agents
             )
             return jnp.array(
                 optimal_cost_including_service_goal_costs, dtype=jnp.float16

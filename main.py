@@ -24,6 +24,7 @@ import yaml
 from flax.core.frozen_dict import FrozenDict
 from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
 from Evaluation.inference import plotting_inference
+from Evaluation.inference_during_training import get_average_testing_stats
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -66,6 +67,9 @@ def main(args):
         num_stored_graphs=args.num_stored_graphs,
         loaded_graphs=training_graphs,
     )
+
+    # Create the testing environment
+    testing_environment = environment
 
     # Create testing environment (for generalizing)
     if args.network_type == "Densenet":
@@ -140,6 +144,8 @@ def main(args):
             "reward_exceed_horizon": args.reward_exceed_horizon,
             "horizon_length_factor": args.horizon_length_factor,
             "random_seed_for_inference": args.random_seed_for_inference,
+            "n_agent": args.n_agent,
+            "reward_service_goal": args.reward_service_goal,
         }
     )
     print("Start training ...")
@@ -191,6 +197,17 @@ def main(args):
             previous_episode_done,
         )
 
+        # Perform inference (using testing environment) (if loop_count divisible by 50 for example - tunable)
+        # Get average and store in metrics, just like loss
+        testing_average_competitive_ratio = jax.lax.cond(
+            loop_count % args.frequency_testing == 0,
+            lambda _: get_average_testing_stats(
+                testing_environment, agent, train_state.params, arguments
+            ),
+            lambda _: jnp.float16(0.0),
+            None,
+        )
+
         # Collect metrics
         metrics = {
             "losses": total_loss,
@@ -199,6 +216,7 @@ def main(args):
             ),  # doing this results in all_rewards with shape (num_timesteps,)
             "all_episode_done": jnp.all(traj_batch.done, axis=1),
             "all_optimal_costs": traj_batch.shortest_path,
+            "testing_average_competitive_ratio": testing_average_competitive_ratio,
         }
         return runner_state, metrics
 
@@ -221,9 +239,6 @@ def main(args):
     train_state = runner_state[0]
     # Metrics will be stacked. Get episode done from all_done and total rewards from all_rewards
     out = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (-1,)), metrics)
-
-    # Create the testing environment
-    testing_environment = environment
 
     plotting_inference(
         log_directory,
