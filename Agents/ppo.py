@@ -160,6 +160,9 @@ class PPO:
         timestep_in_episode = jax.lax.cond(
             episode_done, lambda _: 0, lambda _: timestep_in_episode, operand=None
         )
+        reward_agent_exceed_horizon = jnp.where(
+            dones, jnp.float16(0), self.reward_exceed_horizon
+        )
 
         # Reset if exceed horizon length. Otherwise, increment
         new_env_state, new_belief_states, rewards, timestep_in_episode, dones = (
@@ -167,9 +170,7 @@ class PPO:
                 timestep_in_episode >= self.horizon_length,
                 lambda _: (
                     *self.environment.reset(reset_key),
-                    jnp.full(
-                        self.num_agents, self.reward_exceed_horizon, dtype=jnp.float16
-                    ),
+                    reward_agent_exceed_horizon,
                     0,
                     jnp.full(self.num_agents, True, dtype=bool),
                 ),

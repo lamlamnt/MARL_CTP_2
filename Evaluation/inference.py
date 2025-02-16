@@ -15,6 +15,7 @@ from Environment.CTP_environment import MA_CTP_General
 from Agents.optimistic_agent import Optimistic_Agent
 from Utils.optimal_combination import get_optimal_combination_and_cost
 from Evaluation.plotting import save_data_and_plotting, plot_learning_curve
+from Utils.observe_actions import get_actions
 
 
 # Get layer name and weights from FLAX params
@@ -68,6 +69,18 @@ def plotting_inference(
         jnp.arange(3) + args.random_seed_for_inference
     )
     new_env_state, new_belief_states = environment.reset(init_key)
+
+    get_actions(
+        new_env_state,
+        new_belief_states,
+        environment,
+        agent,
+        model_params,
+        log_directory,
+        env_key,
+        args,
+    )
+
     optimistic_agent = Optimistic_Agent(args.n_agent, n_node)
 
     @scan_tqdm(num_steps_for_inference)
@@ -93,6 +106,9 @@ def plotting_inference(
         timestep_in_episode = jax.lax.cond(
             episode_done, lambda _: 0, lambda _: timestep_in_episode, operand=None
         )
+        reward_agent_exceed_horizon = jnp.where(
+            dones, jnp.float16(0), args.reward_exceed_horizon
+        )
 
         # Reset if exceed horizon length. Otherwise, increment
         new_env_state, new_belief_states, rewards, timestep_in_episode, dones = (
@@ -100,9 +116,7 @@ def plotting_inference(
                 timestep_in_episode >= (args.horizon_length_factor * n_node),
                 lambda _: (
                     *environment.reset(reset_key),
-                    jnp.full(
-                        args.n_agent, args.reward_exceed_horizon, dtype=jnp.float16
-                    ),
+                    reward_agent_exceed_horizon,
                     0,
                     jnp.full(args.n_agent, True, dtype=bool),
                 ),

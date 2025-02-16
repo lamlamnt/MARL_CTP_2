@@ -44,6 +44,9 @@ def get_average_testing_stats(
         timestep_in_episode = jax.lax.cond(
             episode_done, lambda _: 0, lambda _: timestep_in_episode, operand=None
         )
+        reward_agent_exceed_horizon = jnp.where(
+            dones, jnp.float16(0), arguments["reward_exceed_horizon"]
+        )
 
         # Reset if exceed horizon length. Otherwise, increment
         new_env_state, new_belief_states, rewards, timestep_in_episode, dones = (
@@ -52,11 +55,7 @@ def get_average_testing_stats(
                 >= (arguments["horizon_length_factor"] * arguments["n_node"]),
                 lambda _: (
                     *environment.reset(reset_key),
-                    jnp.full(
-                        arguments["n_agent"],
-                        arguments["reward_exceed_horizon"],
-                        dtype=jnp.float16,
-                    ),
+                    reward_agent_exceed_horizon,
                     0,
                     jnp.full(arguments["n_agent"], True, dtype=bool),
                 ),

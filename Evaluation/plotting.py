@@ -124,7 +124,7 @@ def save_data_and_plotting(
     # Get the mean competitive ratio excluding the failed episodes
     if training == False:
         filtered_df = df.groupby("episode").filter(
-            lambda group: (group["reward"] != reward_exceed_horizon * num_agents).all()
+            lambda group: ((group["reward"] % reward_exceed_horizon) != 0).all()
         )
         filtered_episodes_df = (
             filtered_df.groupby("episode").agg("sum").astype(np.float32)
