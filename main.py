@@ -70,7 +70,23 @@ def main(args):
     )
 
     # Create the testing environment
-    testing_environment = environment
+    if args.num_stored_graphs == 1:
+        testing_environment = environment
+    else:
+        inference_key = jax.random.PRNGKey(args.random_seed_for_inference)
+        environment = MA_CTP_General(
+            args.n_agent,
+            n_node,
+            inference_key,
+            prop_stoch=args.prop_stoch,
+            k_edges=args.k_edges,
+            grid_size=n_node,
+            reward_for_invalid_action=args.reward_for_invalid_action,
+            reward_service_goal=args.reward_service_goal,
+            reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
+            num_stored_graphs=args.num_stored_graphs,
+            loaded_graphs=inference_graphs,
+        )
 
     # Create testing environment (for generalizing)
     if args.network_type == "Densenet":

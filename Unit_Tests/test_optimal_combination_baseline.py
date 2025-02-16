@@ -11,6 +11,7 @@ import pytest_print as pp
 import os
 import warnings
 from Agents.optimistic_agent import Optimistic_Agent
+from Utils.plot_graph_env_state import plot_realised_graph_from_env_state
 
 
 @pytest.fixture
@@ -68,6 +69,7 @@ def test_optimistic_agent_2(printer):
     assert jnp.array_equal(actions, jnp.array([3, 2]))
 
 
+# This example does not demonstrate the behaviour where an agent benefits from blocking status knowledge gathered by another agent
 def test_optimistic_agent_2(printer):
     key = jax.random.PRNGKey(50)
     subkey1, subkey = jax.random.split(key)
@@ -106,6 +108,28 @@ def test_optimistic_agent_2(printer):
         subkey, env_state_3, belief_state_3, actions_4
     )
     assert jnp.array_equal(actions_4, jnp.array([10, 10]))
+    total_episodic_reward = rewards_1 + rewards_2 + rewards_3 + rewards_4
+
+    def _calculate_optimal_cost(env_state):
+        _, goals = jax.lax.top_k(jnp.diag(env_state[3, 2:, :]), 2)
+        origins = jnp.argmax(env_state[0, :2, :], axis=1)
+        _, optimal_cost = get_optimal_combination_and_cost(
+            env_state[1, 2:, :],
+            env_state[0, 2:, :],
+            origins,
+            goals,
+            2,
+        )
+        # minus self.reward_service goal because this is a positive number
+        optimal_cost_including_service_goal_costs = optimal_cost - (-0.1) * 2
+        return jnp.array(optimal_cost_including_service_goal_costs, dtype=jnp.float16)
+
+    shortest_path = _calculate_optimal_cost(initial_env_state)
+    current_directory = os.getcwd()
+    parent_dir = os.path.dirname(current_directory)
+    log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
+    plot_realised_graph_from_env_state(initial_env_state, log_directory)
+    assert jnp.isclose(-total_episodic_reward.sum(), shortest_path, atol=1e-2)
 
 
 def test_optimistic_agent_full_episode(

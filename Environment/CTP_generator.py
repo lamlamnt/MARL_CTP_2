@@ -49,8 +49,8 @@ class CTPGraph:
             self.receivers = handcrafted_graph["receivers"]
             self.node_pos = handcrafted_graph["node_pos"]
             self.blocking_prob = handcrafted_graph["blocking_prob"]
-            self.origin = jnp.array([handcrafted_graph["origin"]])
-            self.goal = jnp.array([handcrafted_graph["goal"]])
+            self.origin = handcrafted_graph["origin"]
+            self.goal = handcrafted_graph["goal"]
             self.n_edges = handcrafted_graph["n_edges"]
         else:
             if grid_size == None:
