@@ -21,10 +21,9 @@ def get_actions(
     key,
     args,
 ):
-    plot_realised_graph_from_env_state(initial_env_state, log_directory)
     episode_done = False
-    current_belief_states = initial_belief_states
-    current_env_state = initial_env_state
+    new_belief_states = initial_belief_states
+    new_env_state = initial_env_state
     info = ""
 
     def _calculate_optimal_cost(env_state):
@@ -45,15 +44,18 @@ def get_actions(
         )
         return jnp.array(optimal_cost_including_service_goal_costs, dtype=jnp.float16)
 
-    optimal_cost = _calculate_optimal_cost(current_env_state)
+    optimal_cost = _calculate_optimal_cost(new_env_state)
     info += f"Optimal cost: {optimal_cost}\n"
     timestep_in_episode = 0
-    while not episode_done or timestep_in_episode <= args.horizon_length:
+    n_nodes = initial_env_state.shape[2]
+    while (
+        not episode_done and timestep_in_episode <= args.horizon_length_factor * n_nodes
+    ):
         action_key, env_key = jax.random.split(key, 2)
         # Agent acts
-        actions, action_key = agent.act(action_key, model_params, current_belief_states)
+        actions, action_key = agent.act(action_key, model_params, new_belief_states)
         new_env_state, new_belief_states, rewards, dones, env_key = environment.step(
-            env_key, current_env_state, current_belief_states, actions
+            env_key, new_env_state, new_belief_states, actions
         )
         episode_done = jnp.all(dones)
         timestep_in_episode += 1
@@ -66,5 +68,7 @@ def get_actions(
 
     # Write actions and rewards to JSON file
     args_path = os.path.join(log_directory, "One_Episode_Example" + ".json")
-    with open(args_path, "w") as fh:
-        json.dump(info)
+    with open(args_path, "w", encoding="utf-8") as fh:
+        json.dump(info, fh, ensure_ascii=False, indent=4)
+    plot_realised_graph_from_env_state(initial_env_state, log_directory)
+    # for some reason - it works when used in isolation but during evaluation, it plots learning curve

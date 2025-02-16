@@ -249,6 +249,7 @@ def plotting_inference(
     plt.title("Loss Plot")
     plt.legend()
     plt.savefig(os.path.join(log_directory, "PPO_Loss.png"))
+    plt.close()
 
     # Write to JSON file
     # Record hyperparameters and results in JSON file

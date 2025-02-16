@@ -40,6 +40,7 @@ def plot_learning_curve(testing_average_competitive_ratio, log_directory, args):
     plt.xlabel("Training Timesteps")
     plt.ylabel("Average Competitive Ratio")
     plt.savefig(os.path.join(log_directory, "Smoothened_Learning_Curve.png"))
+    plt.close()
 
 
 def save_data_and_plotting(
@@ -120,6 +121,7 @@ def save_data_and_plotting(
         plt.savefig(
             os.path.join(directory, beginning_str + "histogram_competitive_ratio.png")
         )
+        plt.close()
 
     # Get the mean competitive ratio excluding the failed episodes
     if training == False:
@@ -141,14 +143,14 @@ def save_data_and_plotting(
         result_dict = {
             "average_regret": float(episodes_df["regret"].mean()),
             "average_competitive_ratio": float(episodes_df["competitive_ratio"].mean()),
-            "average_competitive_ratio_excluding_failed_episodes": float(
-                filtered_episodes_df["competitive_ratio"].mean()
+            "average_competitive_ratio_excluding_failed_episodes": round(
+                float(filtered_episodes_df["competitive_ratio"].mean(), 4)
             ),
             "median_competitive_ratio": float(
                 episodes_df["competitive_ratio"].median()
             ),
             "max_competitive_ratio": float(episodes_df["competitive_ratio"].max()),
-            "average_reward": float(episodes_df["reward"].mean()),
+            "average_reward": round(float(episodes_df["reward"].mean()), 4),
             "failure_rate (%)": float(num_reach_horizon * 100 / episodes_df.shape[0]),
             "standard deviation of competitive ratio": float(
                 episodes_df["competitive_ratio"].std()

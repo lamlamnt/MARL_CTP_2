@@ -71,8 +71,10 @@ def main(args):
 
     # Create the testing environment
     if args.num_stored_graphs == 1:
+        print("Test environment is the same as training environment")
         testing_environment = environment
     else:
+        print("Test environment is different from training environment")
         inference_key = jax.random.PRNGKey(args.random_seed_for_inference)
         environment = MA_CTP_General(
             args.n_agent,
