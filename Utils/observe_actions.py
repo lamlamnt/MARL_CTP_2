@@ -24,7 +24,7 @@ def get_actions(
     episode_done = False
     new_belief_states = initial_belief_states
     new_env_state = initial_env_state
-    info = ""
+    info = []
 
     def _calculate_optimal_cost(env_state):
         _, goals = jax.lax.top_k(
@@ -45,7 +45,7 @@ def get_actions(
         return jnp.array(optimal_cost_including_service_goal_costs, dtype=jnp.float16)
 
     optimal_cost = _calculate_optimal_cost(new_env_state)
-    info += f"Optimal cost: {optimal_cost}\n"
+    info.append(f"Optimal cost: {optimal_cost}\n")
     timestep_in_episode = 0
     n_nodes = initial_env_state.shape[2]
     while (
@@ -62,9 +62,9 @@ def get_actions(
         _, key = jax.random.split(key)
 
         # Store actions and rewards to string
-        info += f"Time step: {timestep_in_episode}\n"
-        info += f"Actions: {actions}\n"
-        info += f"Rewards: {rewards}\n"
+        info.append(f"Time step: {timestep_in_episode}\n")
+        info.append(f"Actions: {actions}\n")
+        info.append(f"Rewards: {rewards}\n")
 
     # Write actions and rewards to JSON file
     args_path = os.path.join(log_directory, "One_Episode_Example" + ".json")

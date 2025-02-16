@@ -144,7 +144,7 @@ def save_data_and_plotting(
             "average_regret": float(episodes_df["regret"].mean()),
             "average_competitive_ratio": float(episodes_df["competitive_ratio"].mean()),
             "average_competitive_ratio_excluding_failed_episodes": round(
-                float(filtered_episodes_df["competitive_ratio"].mean(), 4)
+                float(filtered_episodes_df["competitive_ratio"].mean()), 4
             ),
             "median_competitive_ratio": float(
                 episodes_df["competitive_ratio"].median()
