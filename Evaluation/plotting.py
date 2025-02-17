@@ -136,9 +136,7 @@ def save_data_and_plotting(
             filtered_episodes_df["reward"].abs() / filtered_episodes_df["optimal_cost"]
         )
         # Maybe an alternative way is to get the difference in number of rows between the 2 dataframes
-        num_reach_horizon = np.sum(
-            np.isclose(all_total_rewards, reward_exceed_horizon * num_agents, atol=0.1)
-        )
+        num_reach_horizon = len(episodes_df) - len(filtered_episodes_df)
 
         result_dict = {
             "average_regret": float(episodes_df["regret"].mean()),
