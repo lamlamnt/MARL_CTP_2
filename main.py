@@ -39,8 +39,9 @@ def main(args):
     if args.ent_coeff_schedule == "sigmoid_checkpoint":
         assert num_loops < args.sigmoid_total_nums_all // args.num_steps_before_update
         assert args.sigmoid_beginning_offset_num < args.sigmoid_total_nums_all
-
     n_node = args.n_node
+    if args.num_critic_values != 1 and args.num_critic_values != 2:
+        raise ValueError("num_critic_values must be 1 or 2")
 
     # Initialize and setting things up
     print("Setting up the environment ...")
@@ -90,7 +91,6 @@ def main(args):
             loaded_graphs=inference_graphs,
         )
 
-    # Create testing environment (for generalizing)
     if args.network_type == "Densenet":
         model = DenseNet_ActorCritic(
             n_node,
@@ -99,6 +99,7 @@ def main(args):
             bn_size=args.densenet_bn_size,
             growth_rate=args.densenet_growth_rate,
             num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+            num_critic_values=args.num_critic_values,
         )
     else:
         model = DenseNet_ActorCritic_Same(
@@ -108,6 +109,7 @@ def main(args):
             bn_size=args.densenet_bn_size,
             growth_rate=args.densenet_growth_rate,
             num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+            num_critic_values=args.num_critic_values,
         )
     init_params = model.init(
         jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
@@ -131,29 +133,33 @@ def main(args):
     init_key, env_action_key = jax.vmap(jax.random.PRNGKey)(
         jnp.arange(2) + args.random_seed_for_training
     )
-    agent = PPO(
-        model,
-        environment,
-        args.discount_factor,
-        args.gae_lambda,
-        args.clip_eps,
-        args.vf_coeff,
-        args.ent_coeff,
-        batch_size=args.num_steps_before_update,
-        num_minibatches=args.num_minibatches,
-        horizon_length=args.horizon_length_factor * n_node,
-        reward_exceed_horizon=args.reward_exceed_horizon,
-        num_loops=num_loops,
-        anneal_ent_coeff=args.anneal_ent_coeff,
-        deterministic_inference_policy=args.deterministic_inference_policy,
-        ent_coeff_schedule=args.ent_coeff_schedule,
-        sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
-        // args.num_steps_before_update,
-        sigmoid_total_nums_all=args.sigmoid_total_nums_all
-        // args.num_steps_before_update,
-        num_agents=args.n_agent,
-        reward_service_goal=args.reward_service_goal,
-    )
+    if args.num_critic_values == 1:
+        agent = PPO(
+            model,
+            environment,
+            args.discount_factor,
+            args.gae_lambda,
+            args.clip_eps,
+            args.vf_coeff,
+            args.ent_coeff,
+            batch_size=args.num_steps_before_update,
+            num_minibatches=args.num_minibatches,
+            horizon_length=args.horizon_length_factor * n_node,
+            reward_exceed_horizon=args.reward_exceed_horizon,
+            num_loops=num_loops,
+            anneal_ent_coeff=args.anneal_ent_coeff,
+            deterministic_inference_policy=args.deterministic_inference_policy,
+            ent_coeff_schedule=args.ent_coeff_schedule,
+            sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
+            // args.num_steps_before_update,
+            sigmoid_total_nums_all=args.sigmoid_total_nums_all
+            // args.num_steps_before_update,
+            num_agents=args.n_agent,
+            reward_service_goal=args.reward_service_goal,
+            individual_reward_weight=args.individual_reward_weight,
+        )
+    else:
+        raise NotImplementedError("Not implemented yet")
 
     # For the purpose of plotting the learning curve
     arguments = FrozenDict(
@@ -541,6 +547,20 @@ if __name__ == "__main__":
         required=False,
         default=10000,
         help="For sigmoid ent coeff schedule checkpoint training. Unit: in number of timesteps. In the script, it will be divided by num_steps_before_update to convert to num_loops unit",
+    )
+    parser.add_argument(
+        "--num_critic_values",
+        type=int,
+        required=False,
+        default=1,
+        help="Options: only 1 or 2. 2 means it tries to estimate both the individual and team reward",
+    )
+    parser.add_argument(
+        "--individual_reward_weight",
+        type=float,
+        required=False,
+        default=1.0,
+        help="1.0 means only use individual reward. 0 means only use team reward. Related to how GAE is calculated",
     )
     args = parser.parse_args()
     if args.graph_mode == "store":

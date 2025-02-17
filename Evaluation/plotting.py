@@ -70,7 +70,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 2, "optimal_cost": 2})
+            .round({"reward": 3, "optimal_cost": 3})
         )
     else:
         # For inference, get the additional optimistic baseline
@@ -87,7 +87,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 2, "optimal_cost": 2, "optimistic_baseline": 2})
+            .round({"reward": 3, "optimal_cost": 3, "optimistic_baseline": 3})
         )
         episodes_df["competitive_ratio_optimistic_baseline"] = (
             episodes_df["optimistic_baseline"] / episodes_df["optimal_cost"]
@@ -129,7 +129,10 @@ def save_data_and_plotting(
             lambda group: ((group["reward"] % reward_exceed_horizon) != 0).all()
         )
         filtered_episodes_df = (
-            filtered_df.groupby("episode").agg("sum").astype(np.float32)
+            filtered_df.groupby("episode")
+            .agg("sum")
+            .astype(np.float32)
+            .round({"reward": 3, "optimal_cost": 3})
         )
         filtered_episodes_df = filtered_episodes_df.iloc[:-1]
         filtered_episodes_df["competitive_ratio"] = (
@@ -141,14 +144,14 @@ def save_data_and_plotting(
         result_dict = {
             "average_regret": float(episodes_df["regret"].mean()),
             "average_competitive_ratio": float(episodes_df["competitive_ratio"].mean()),
-            "average_competitive_ratio_excluding_failed_episodes": round(
-                float(filtered_episodes_df["competitive_ratio"].mean()), 4
+            "average_competitive_ratio_excluding_failed_episodes": float(
+                filtered_episodes_df["competitive_ratio"].mean()
             ),
             "median_competitive_ratio": float(
                 episodes_df["competitive_ratio"].median()
             ),
             "max_competitive_ratio": float(episodes_df["competitive_ratio"].max()),
-            "average_reward": round(float(episodes_df["reward"].mean()), 4),
+            "average_reward": float(episodes_df["reward"].mean()),
             "failure_rate (%)": float(num_reach_horizon * 100 / episodes_df.shape[0]),
             "standard deviation of competitive ratio": float(
                 episodes_df["competitive_ratio"].std()

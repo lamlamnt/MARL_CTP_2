@@ -60,6 +60,7 @@ if __name__ == "__main__":
         sigmoid_total_nums_all=100,
         num_agents=2,
         reward_service_goal=-0.1,
+        individual_reward_weight=1.0,
     )
     state_shape = (6, 7, 5)
     init_params = model.init(jax.random.PRNGKey(0), jax.random.normal(key, state_shape))

@@ -46,6 +46,7 @@ class PPO:
         sigmoid_total_nums_all: int,
         num_agents: int,
         reward_service_goal: float,
+        individual_reward_weight: float,
     ) -> None:
         self.model = model
         self.environment = environment
@@ -66,6 +67,7 @@ class PPO:
         self.sigmoid_total_nums_all = sigmoid_total_nums_all
         self.num_agents = num_agents
         self.reward_service_goal = jnp.float16(reward_service_goal)
+        self.individual_reward_weight = jnp.float16(individual_reward_weight)
 
     def _ent_coeff_schedule(self, loop_count):
         # linear or sigmoid or plateau schedule
@@ -255,6 +257,11 @@ class PPO:
                 transition.reward,
             )
             team_reward = jnp.sum(reward, axis=0)
+            broadcasted_team_reward = jnp.broadcast_to(team_reward, reward.shape)
+            reward = (
+                self.individual_reward_weight * reward
+                + (1 - self.individual_reward_weight) * broadcasted_team_reward
+            )
             delta = (
                 reward + self.discount_factor * next_value * (1 - done) - critic_value
             )
