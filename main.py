@@ -428,7 +428,7 @@ if __name__ == "__main__":
         "--graph_identifier",
         type=str,
         required=False,
-        default="node_10_relabel_0.4",
+        default="node_10_agent_2",
     )
     parser.add_argument(
         "--load_network_directory",

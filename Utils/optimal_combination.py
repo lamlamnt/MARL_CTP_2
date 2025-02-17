@@ -38,10 +38,15 @@ def get_optimal_combination_and_cost(
     # Get the best combination (n!)
     # Get permutation
     permutations = jnp.array(list(itertools.permutations(jnp.arange(num_agents))))
+    expanded_distances = jnp.tile(distances, (permutations.shape[0], 1, 1))
 
     # Sum up the distances for each permutation
-    selected_distances = jnp.take_along_axis(distances, permutations, axis=1)
-    total_distances = jnp.sum(selected_distances, axis=0)
+    # selected_distances = jnp.take_along_axis(distances, permutations, axis=1)
+    selected_distances = jnp.take_along_axis(
+        expanded_distances, permutations[:, :, None], axis=2
+    )
+    selected_distances = selected_distances.squeeze(-1)
+    total_distances = jnp.sum(selected_distances, axis=1)
     best_combination_index = jnp.argmin(total_distances)
     best_combination_cost = jnp.min(total_distances)
     return permutations[best_combination_index], best_combination_cost

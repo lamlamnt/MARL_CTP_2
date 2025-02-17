@@ -142,3 +142,23 @@ def test_optimistic_agent_full_episode(
         environment, initial_belief_states, initial_env_state, key
     )
     assert jnp.isclose(total_cost, 1.2, rtol=1e-2)
+
+
+# test get_optimal_combination_and_cost for 3 agents
+def test_get_optimal_combination_and_cost_3_agents(printer):
+    key = jax.random.PRNGKey(30)
+    environment = CTP_environment.MA_CTP_General(
+        3, 7, key, prop_stoch=0.8, grid_size=10, num_stored_graphs=1
+    )
+    initial_env_state, initial_belief_states = environment.reset(key)
+    _, goals = jax.lax.top_k(jnp.diag(initial_env_state[3, 3:, :]), 3)
+    best_combination, best_combination_cost = get_optimal_combination_and_cost(
+        initial_env_state[1, 3:, :],
+        initial_env_state[0, 3:, :],
+        jnp.array([0, 1, 2]),
+        jnp.array([3, 4, 5]),
+        3,
+    )
+    assert best_combination.shape == (3,)
+    assert jnp.isclose(best_combination_cost, 1, rtol=1e-2)
+    assert jnp.array_equal(best_combination, jnp.array([0, 1, 2]))

@@ -1,0 +1,23 @@
+method: bayes               
+metric:
+  name: average_competitive_ratio    
+  goal: minimize           
+parameters:
+  clip_eps:
+    min: 0.05
+    max: 0.25
+  vf_coeff:
+    min: 0.05
+    max: 0.25
+  ent_coeff:
+    min: 0.05
+    max: 0.25
+  reward_fail_to_service_goal_larger_index:
+    min: -1
+    max: -0.1
+  network_type:
+    values: ["Densenet","Densenet_Same"]
+  optimizer_norm_clip:
+    min: 0.5
+    max: 10
+  
