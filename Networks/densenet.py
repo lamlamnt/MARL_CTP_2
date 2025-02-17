@@ -118,7 +118,6 @@ class DenseNet_ActorCritic(nn.Module):
     bn_size: int = 4
     growth_rate: int = 32
     densenet_kernel_init: callable = nn.initializers.kaiming_normal()
-    num_critic_values: int = 1
 
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> tuple[distrax.Categorical, float]:
@@ -144,10 +143,9 @@ class DenseNet_ActorCritic(nn.Module):
             growth_rate=self.growth_rate,
             densenet_kernel_init=self.densenet_kernel_init,
         )(x)
-        critic = nn.Dense(
-            self.num_critic_values, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )(critic)
-
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic
+        )
         return pi, jnp.squeeze(critic, axis=-1)
 
 
@@ -158,7 +156,6 @@ class DenseNet_ActorCritic_Same(nn.Module):
     bn_size: int = 4
     growth_rate: int = 32
     densenet_kernel_init: callable = nn.initializers.kaiming_normal()
-    num_critic_values: int = 1
 
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> tuple[distrax.Categorical, float]:
@@ -176,8 +173,78 @@ class DenseNet_ActorCritic_Same(nn.Module):
         actor_mean = jnp.where(action_mask == -jnp.inf, -jnp.inf, actor_mean)
         pi = distrax.Categorical(logits=actor_mean)
 
-        critic = nn.Dense(
-            self.num_critic_values, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )(actor_mean_same)
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            actor_mean_same
+        )
 
         return pi, jnp.squeeze(critic, axis=-1)
+
+
+# Need another new class because 1 critic value -> need the squeeze. 2 critic values -> the squeeze will error
+class DenseNet_ActorCritic_Same_2_Critic_Values(nn.Module):
+    num_classes: int
+    act_fn: callable = nn.leaky_relu
+    num_layers: tuple = (4, 4, 4)
+    bn_size: int = 4
+    growth_rate: int = 32
+    densenet_kernel_init: callable = nn.initializers.kaiming_normal()
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray) -> tuple[distrax.Categorical, float]:
+        action_mask = decide_validity_of_action_space(x)
+        actor_mean_same = DenseNet(
+            act_fn=self.act_fn,
+            num_layers=self.num_layers,
+            bn_size=self.bn_size,
+            growth_rate=self.growth_rate,
+            densenet_kernel_init=self.densenet_kernel_init,
+        )(x)
+        actor_mean = nn.Dense(
+            self.num_classes + 1, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(actor_mean_same)
+        actor_mean = jnp.where(action_mask == -jnp.inf, -jnp.inf, actor_mean)
+        pi = distrax.Categorical(logits=actor_mean)
+
+        critic = nn.Dense(2, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            actor_mean_same
+        )
+
+        return pi, critic
+
+
+class DenseNet_ActorCritic_2_Critic_Values(nn.Module):
+    num_classes: int
+    act_fn: callable = nn.leaky_relu
+    num_layers: tuple = (4, 4, 4)
+    bn_size: int = 4
+    growth_rate: int = 32
+    densenet_kernel_init: callable = nn.initializers.kaiming_normal()
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray) -> tuple[distrax.Categorical, float]:
+        action_mask = decide_validity_of_action_space(x)
+        actor_mean = DenseNet(
+            act_fn=self.act_fn,
+            num_layers=self.num_layers,
+            bn_size=self.bn_size,
+            growth_rate=self.growth_rate,
+            densenet_kernel_init=self.densenet_kernel_init,
+        )(x)
+        actor_mean = nn.Dense(
+            self.num_classes + 1, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(actor_mean)
+
+        actor_mean = jnp.where(action_mask == -jnp.inf, -jnp.inf, actor_mean)
+        pi = distrax.Categorical(logits=actor_mean)
+
+        critic = DenseNet(
+            act_fn=self.act_fn,
+            num_layers=self.num_layers,
+            bn_size=self.bn_size,
+            growth_rate=self.growth_rate,
+            densenet_kernel_init=self.densenet_kernel_init,
+        )(x)
+        critic = nn.Dense(2, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic
+        )
+        return pi, critic

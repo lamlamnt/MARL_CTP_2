@@ -3,8 +3,14 @@ import jax
 import jax.numpy as jnp
 from Environment.CTP_environment import MA_CTP_General
 from Environment import CTP_generator
-from Networks.densenet import DenseNet_ActorCritic, DenseNet_ActorCritic_Same
+from Networks.densenet import (
+    DenseNet_ActorCritic,
+    DenseNet_ActorCritic_Same,
+    DenseNet_ActorCritic_Same_2_Critic_Values,
+    DenseNet_ActorCritic_2_Critic_Values,
+)
 from Agents.ppo import PPO
+from Agents.ppo_combine_individual_team import PPO_2_Critic_Values
 import argparse
 import optax
 from flax.training.train_state import TrainState
@@ -77,7 +83,7 @@ def main(args):
     else:
         print("Test environment is different from training environment")
         inference_key = jax.random.PRNGKey(args.random_seed_for_inference)
-        environment = MA_CTP_General(
+        testing_environment = MA_CTP_General(
             args.n_agent,
             n_node,
             inference_key,
@@ -91,7 +97,7 @@ def main(args):
             loaded_graphs=inference_graphs,
         )
 
-    if args.network_type == "Densenet":
+    if args.network_type == "Densenet" and args.num_critic_values == 1:
         model = DenseNet_ActorCritic(
             n_node,
             act_fn=nn.leaky_relu,
@@ -99,9 +105,8 @@ def main(args):
             bn_size=args.densenet_bn_size,
             growth_rate=args.densenet_growth_rate,
             num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
-            num_critic_values=args.num_critic_values,
         )
-    else:
+    elif args.network_type == "Densenet_Same" and args.num_critic_values == 1:
         model = DenseNet_ActorCritic_Same(
             n_node,
             act_fn=nn.leaky_relu,
@@ -109,8 +114,26 @@ def main(args):
             bn_size=args.densenet_bn_size,
             growth_rate=args.densenet_growth_rate,
             num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
-            num_critic_values=args.num_critic_values,
         )
+    elif args.network_type == "Densenet" and args.num_critic_values == 2:
+        model = DenseNet_ActorCritic_2_Critic_Values(
+            n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    else:
+        model = DenseNet_ActorCritic_Same_2_Critic_Values(
+            n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+
     init_params = model.init(
         jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
     )
@@ -434,7 +457,7 @@ if __name__ == "__main__":
         "--graph_identifier",
         type=str,
         required=False,
-        default="node_10_agent_2",
+        default="node_10_agent_2_prop_0.4",
     )
     parser.add_argument(
         "--load_network_directory",
