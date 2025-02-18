@@ -443,7 +443,7 @@ if __name__ == "__main__":
         "--factor_inference_timesteps",
         type=int,
         required=False,
-        default=1000,
+        default=2000,
         help="Number to multiply with the number of nodes to get the total number of inference timesteps",
     )
     parser.add_argument(

@@ -150,6 +150,13 @@ def save_data_and_plotting(
             "median_competitive_ratio": float(
                 episodes_df["competitive_ratio"].median()
             ),
+            "min_competitive_ratio": float(episodes_df["competitive_ratio"].min()),
+            "first_quartile_competitive_ratio": float(
+                episodes_df["competitive_ratio"].quantile(0.25)
+            ),
+            "third_quartile_competitive_ratio": float(
+                episodes_df["competitive_ratio"].quantile(0.75)
+            ),
             "max_competitive_ratio": float(episodes_df["competitive_ratio"].max()),
             "average_reward": float(episodes_df["reward"].mean()),
             "failure_rate (%)": float(num_reach_horizon * 100 / episodes_df.shape[0]),
@@ -164,6 +171,15 @@ def save_data_and_plotting(
             ),
             "median_competitive_ratio_of_optimistic_baseline": float(
                 episodes_df["competitive_ratio_optimistic_baseline"].median()
+            ),
+            "min_competitive_ratio_of_optimistic_baseline": float(
+                episodes_df["competitive_ratio_optimistic_baseline"].min()
+            ),
+            "first_quartile_competitive_ratio_of_optimistic_baseline": float(
+                episodes_df["competitive_ratio_optimistic_baseline"].quantile(0.25)
+            ),
+            "third_quartile_competitive_ratio_of_optimistic_baseline": float(
+                episodes_df["competitive_ratio_optimistic_baseline"].quantile(0.75)
             ),
             "standard_deviation_competitive_ratio_of_optimistic_baseline": float(
                 episodes_df["competitive_ratio_optimistic_baseline"].std()

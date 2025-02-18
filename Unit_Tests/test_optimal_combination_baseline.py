@@ -162,3 +162,18 @@ def test_get_optimal_combination_and_cost_3_agents(printer):
     assert best_combination.shape == (3,)
     assert jnp.isclose(best_combination_cost, 1, rtol=1e-2)
     assert jnp.array_equal(best_combination, jnp.array([0, 1, 2]))
+
+
+# test optimistic baseline for 1 agent - prop 0.4 10 nodes
+# test optimistic_agent.get_total_cost
+def test_optimistic_baseline_1_agent(printer):
+    key = jax.random.PRNGKey(30)
+    environment = CTP_environment.MA_CTP_General(
+        1, 10, key, prop_stoch=0.4, grid_size=10, num_stored_graphs=1
+    )
+    initial_env_state, initial_belief_states = environment.reset(key)
+    optimistic_agent = Optimistic_Agent(1, 10)
+    total_cost = optimistic_agent.get_total_cost(
+        environment, initial_belief_states, initial_env_state, key
+    )
+    assert jnp.isclose(total_cost, 1.1, rtol=1e-2)
