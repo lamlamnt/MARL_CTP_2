@@ -44,7 +44,7 @@ NUM_CHANNELS_IN_BELIEF_STATE = 6
 
 def decide_hand_crafted_graph(args):
     if args.hand_crafted_graph == "sacrifice_in_choosing_goals":
-        n_node, defined_graph = get_go_past_goal_without_servicing_graph()
+        n_node, defined_graph = get_sacrifice_in_choosing_goals_graph()
     elif args.hand_crafted_graph == "sacrifice_in_exploring":
         n_node, defined_graph = get_sacrifice_in_exploring_graph()
     elif args.hand_crafted_graph == "smaller_index_agent_behaves_differently":
