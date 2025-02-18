@@ -259,15 +259,28 @@ class PPO_2_Critic_Values:
             )
             team_reward = jnp.sum(reward, axis=0)
             broadcasted_team_reward = jnp.broadcast_to(team_reward, reward.shape)
-            reward = (
-                self.individual_reward_weight * reward
-                + (1 - self.individual_reward_weight) * broadcasted_team_reward
+            individual_delta = (
+                reward
+                + self.discount_factor * next_value * (1 - done)
+                - critic_value[0]
             )
-            delta = (
-                reward + self.discount_factor * next_value * (1 - done) - critic_value
+            team_delta = (
+                broadcasted_team_reward
+                + self.discount_factor * next_value * (1 - done)
+                - critic_value[1]
             )
-            gae = delta + self.discount_factor * self.gae_lambda * (1 - done) * gae
-            return (gae, critic_value), gae
+            # separate delta and gae
+            individual_gae = (
+                individual_delta
+                + self.discount_factor * self.gae_lambda * (1 - done) * gae[0]
+            )
+            team_gae = (
+                team_delta
+                + self.discount_factor * self.gae_lambda * (1 - done) * gae[1]
+            )
+            return (jnp.stack([individual_gae, team_gae]), critic_value), jnp.stack(
+                [individual_gae, team_gae]
+            )
 
         # Apply get_advantage to each element in traj_batch
         _, advantages = jax.lax.scan(
@@ -303,18 +316,40 @@ class PPO_2_Critic_Values:
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
-        gae = (gae - gae.mean()) / (gae.std() + 1e-8)
-        loss_actor1 = ratio * gae
-        loss_actor2 = (
+        # Normalize individual and team GAE separately
+        individual_gae = (gae[0] - gae[0].mean()) / (gae[0].std() + 1e-8)
+        team_gae = (gae[1] - gae[1].mean()) / (gae[1].std() + 1e-8)
+
+        # Calculate losses for individual component
+        individual_loss_actor1 = ratio * individual_gae
+        individual_loss_actor2 = (
             jnp.clip(
                 ratio,
                 1.0 - self.clip_eps,
                 1.0 + self.clip_eps,
             )
-            * gae
+            * individual_gae
         )
-        loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-        loss_actor = loss_actor.mean()
+        individual_loss = -jnp.minimum(individual_loss_actor1, individual_loss_actor2)
+
+        # Calculate losses for team component
+        team_loss_actor1 = ratio * team_gae
+        team_loss_actor2 = (
+            jnp.clip(
+                ratio,
+                1.0 - self.clip_eps,
+                1.0 + self.clip_eps,
+            )
+            * team_gae
+        )
+        team_loss = -jnp.minimum(team_loss_actor1, team_loss_actor2)
+
+        # Combine losses with weighting
+        loss_actor = (
+            self.individual_reward_weight * individual_loss
+            + (1 - self.individual_reward_weight) * team_loss
+        ).mean()
+
         entropy = pi.entropy().mean()
 
         total_loss = loss_actor + self.vf_coeff * value_loss - ent_coeff * entropy

@@ -32,8 +32,28 @@ from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_be
 from Evaluation.inference import plotting_inference
 from Evaluation.inference_during_training import get_average_testing_stats
 from Utils.load_store_graphs import load_graphs, store_graphs
+from Utils.hand_crafted_graphs import (
+    get_go_past_goal_without_servicing_graph,
+    get_smaller_index_agent_behaves_differently_graph,
+    get_sacrifice_in_exploring_graph,
+    get_sacrifice_in_choosing_goals_graph,
+)
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
+
+
+def decide_hand_crafted_graph(args):
+    if args.hand_crafted_graph == "sacrifice_in_choosing_goals":
+        n_node, defined_graph = get_go_past_goal_without_servicing_graph()
+    elif args.hand_crafted_graph == "sacrifice_in_exploring":
+        n_node, defined_graph = get_sacrifice_in_exploring_graph()
+    elif args.hand_crafted_graph == "smaller_index_agent_behaves_differently":
+        n_node, defined_graph = get_smaller_index_agent_behaves_differently_graph()
+    elif args.hand_crafted_graph == "go_past_goal_without_servicing":
+        n_node, defined_graph = get_go_past_goal_without_servicing_graph()
+    else:
+        raise ValueError("Invalid hand_crafted_graph")
+    return n_node, defined_graph
 
 
 def main(args):
@@ -61,20 +81,39 @@ def main(args):
     subkeys = jax.random.split(key, num=2)
     online_key, environment_key = subkeys
 
-    # Create the training environment
-    environment = MA_CTP_General(
-        args.n_agent,
-        n_node,
-        environment_key,
-        prop_stoch=args.prop_stoch,
-        k_edges=args.k_edges,
-        grid_size=n_node,
-        reward_for_invalid_action=args.reward_for_invalid_action,
-        reward_service_goal=args.reward_service_goal,
-        reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
-        num_stored_graphs=args.num_stored_graphs,
-        loaded_graphs=training_graphs,
-    )
+    # Hand crafted graphs
+    if args.hand_crafted_graph != "None":
+        assert args.num_stored_graphs == 1
+        assert args.graph_mode == "generate"
+        n_node, defined_graph = decide_hand_crafted_graph(args)
+        environment = MA_CTP_General(
+            args.n_agent,
+            n_node,
+            environment_key,
+            prop_stoch=args.prop_stoch,
+            k_edges=args.k_edges,
+            grid_size=n_node,
+            reward_for_invalid_action=args.reward_for_invalid_action,
+            reward_service_goal=args.reward_service_goal,
+            reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
+            num_stored_graphs=args.num_stored_graphs,
+            loaded_graphs=defined_graph,
+        )
+    else:
+        # Create the training environment
+        environment = MA_CTP_General(
+            args.n_agent,
+            n_node,
+            environment_key,
+            prop_stoch=args.prop_stoch,
+            k_edges=args.k_edges,
+            grid_size=n_node,
+            reward_for_invalid_action=args.reward_for_invalid_action,
+            reward_service_goal=args.reward_service_goal,
+            reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
+            num_stored_graphs=args.num_stored_graphs,
+            loaded_graphs=training_graphs,
+        )
 
     # Create the testing environment
     if args.num_stored_graphs == 1:
@@ -414,7 +453,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hand_crafted_graph",
         type=str,
-        help="Options: None,diamond,n_stochastic. If anything other than None is specified, all other args relating to environment such as num of nodes are ignored.",
+        help="Options: None, sacrifice_in_choosing_goals, sacrifice_in_exploring, smaller_index_agent_behaves_differently, go_past_goal_without_servicing. If anything other than None is specified, all other args relating to environment such as num of nodes are ignored.",
         required=False,
         default="None",
     )
