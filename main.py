@@ -221,7 +221,30 @@ def main(args):
             individual_reward_weight=args.individual_reward_weight,
         )
     else:
-        raise NotImplementedError("Not implemented yet")
+        agent = PPO_2_Critic_Values(
+            model,
+            environment,
+            args.discount_factor,
+            args.gae_lambda,
+            args.clip_eps,
+            args.vf_coeff,
+            args.ent_coeff,
+            batch_size=args.num_steps_before_update,
+            num_minibatches=args.num_minibatches,
+            horizon_length=args.horizon_length_factor * n_node,
+            reward_exceed_horizon=args.reward_exceed_horizon,
+            num_loops=num_loops,
+            anneal_ent_coeff=args.anneal_ent_coeff,
+            deterministic_inference_policy=args.deterministic_inference_policy,
+            ent_coeff_schedule=args.ent_coeff_schedule,
+            sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
+            // args.num_steps_before_update,
+            sigmoid_total_nums_all=args.sigmoid_total_nums_all
+            // args.num_steps_before_update,
+            num_agents=args.n_agent,
+            reward_service_goal=args.reward_service_goal,
+            individual_reward_weight=args.individual_reward_weight,
+        )
 
     # For the purpose of plotting the learning curve
     arguments = FrozenDict(
