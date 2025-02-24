@@ -261,12 +261,12 @@ class PPO_2_Critic_Values:
             broadcasted_team_reward = jnp.broadcast_to(team_reward, reward.shape)
             individual_delta = (
                 reward
-                + self.discount_factor * next_value * (1 - done)
+                + self.discount_factor * next_value[0] * (1 - done)
                 - critic_value[0]
             )
             team_delta = (
                 broadcasted_team_reward
-                + self.discount_factor * next_value * (1 - done)
+                + self.discount_factor * next_value[1] * (1 - done)
                 - critic_value[1]
             )
             # separate delta and gae
@@ -316,9 +316,13 @@ class PPO_2_Critic_Values:
 
         # CALCULATE ACTOR LOSS
         ratio = jnp.exp(log_prob - traj_batch.log_prob)
+        # gae has shape (1800,2,2)
+        # ratio has shape(1800,2)
         # Normalize individual and team GAE separately
-        individual_gae = (gae[0] - gae[0].mean()) / (gae[0].std() + 1e-8)
-        team_gae = (gae[1] - gae[1].mean()) / (gae[1].std() + 1e-8)
+        individual_gae = (gae[:, :, 0] - gae[:, :, 0].mean()) / (
+            gae[:, :, 0].std() + 1e-8
+        )
+        team_gae = (gae[:, :, 1] - gae[:, :, 1].mean()) / (gae[:, :, 1].std() + 1e-8)
 
         # Calculate losses for individual component
         individual_loss_actor1 = ratio * individual_gae
