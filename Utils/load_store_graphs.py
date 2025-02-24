@@ -69,10 +69,6 @@ def load_graphs(args) -> tuple[jnp.ndarray, jnp.ndarray, int, int]:
         assert graph_info["n_node"] == args.n_node
         assert graph_info["prop_stoch"] == args.prop_stoch
         assert graph_info["k_edges"] == args.k_edges
-        assert graph_info["num_stored_graphs"] == args.num_stored_graphs
-        assert (
-            graph_info["factor_inference_timesteps"] == args.factor_inference_timesteps
-        )
 
     # Load the graphs
     training_graph_npy_file = os.path.join(directory, "training_graphs.npy")

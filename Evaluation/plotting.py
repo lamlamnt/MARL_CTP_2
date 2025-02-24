@@ -70,7 +70,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 3, "optimal_cost": 3})
+            .round({"reward": 2, "optimal_cost": 2})
         )
     else:
         # For inference, get the additional optimistic baseline
@@ -87,7 +87,7 @@ def save_data_and_plotting(
             df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 3, "optimal_cost": 3, "optimistic_baseline": 3})
+            .round({"reward": 2, "optimal_cost": 2, "optimistic_baseline": 2})
         )
         episodes_df["competitive_ratio_optimistic_baseline"] = (
             episodes_df["optimistic_baseline"] / episodes_df["optimal_cost"]
@@ -132,7 +132,7 @@ def save_data_and_plotting(
             filtered_df.groupby("episode")
             .agg("sum")
             .astype(np.float32)
-            .round({"reward": 3, "optimal_cost": 3})
+            .round({"reward": 2, "optimal_cost": 2})
         )
         filtered_episodes_df = filtered_episodes_df.iloc[:-1]
         filtered_episodes_df["competitive_ratio"] = (
