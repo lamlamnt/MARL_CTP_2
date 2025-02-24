@@ -49,5 +49,5 @@ if __name__ == "__main__":
         "prop_stoch": prop_stoch,
         "k_edges": None,
     }
-    with open(os.path.join(directory, "graph_info.pkl"), "wb") as f:
+    with open(os.path.join(new_directory, "graph_info.pkl"), "wb") as f:
         pickle.dump(graph_info, f)

@@ -219,6 +219,7 @@ def main(args):
             num_agents=args.n_agent,
             reward_service_goal=args.reward_service_goal,
             individual_reward_weight=args.individual_reward_weight,
+            individual_reward_weight_schedule=args.anneal_individual_reward_weight,
         )
     else:
         agent = PPO_2_Critic_Values(
@@ -244,6 +245,7 @@ def main(args):
             num_agents=args.n_agent,
             reward_service_goal=args.reward_service_goal,
             individual_reward_weight=args.individual_reward_weight,
+            individual_reward_weight_schedule=args.anneal_individual_reward_weight,
         )
 
     # For the purpose of plotting the learning curve
@@ -284,7 +286,9 @@ def main(args):
         _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
             train_state.params, augmented_state
         )
-        advantages, targets = agent.calculate_gae(traj_batch, last_critic_val)
+        advantages, targets = agent.calculate_gae(
+            traj_batch, last_critic_val, loop_count
+        )
         # advantages and targets are of shape (num_steps_before_update,num_agents)
 
         # Update the network
@@ -633,6 +637,8 @@ if __name__ == "__main__":
         default=10000,
         help="For sigmoid ent coeff schedule checkpoint training. Unit: in number of timesteps. In the script, it will be divided by num_steps_before_update to convert to num_loops unit",
     )
+
+    # Hyperparameters specific to multi-agent
     parser.add_argument(
         "--num_critic_values",
         type=int,
@@ -647,6 +653,14 @@ if __name__ == "__main__":
         default=1.0,
         help="1.0 means only use individual reward. 0 means only use team reward. Related to how GAE is calculated",
     )
+    parser.add_argument(
+        "--anneal_individual_reward_weight",
+        type=str,
+        default="constant",
+        required=False,
+        help="Options: constant, linear_decay. The arg individual_reward_weight is the starting weight. Constant or linear annealing to 0.0 over time during training",
+    )
+
     args = parser.parse_args()
     if args.graph_mode == "store":
         print("Generating graphs for storage ...")

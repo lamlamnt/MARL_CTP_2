@@ -42,6 +42,11 @@ def plot_learning_curve(testing_average_competitive_ratio, log_directory, args):
     plt.savefig(os.path.join(log_directory, "Smoothened_Learning_Curve.png"))
     plt.close()
 
+    # Store the learning curve values (the Pandas series) in a .csv file
+    learning_curve_series.to_csv(
+        os.path.join(log_directory, "learning_curve_series.csv"), index=False
+    )
+
 
 def save_data_and_plotting(
     all_episode_done,

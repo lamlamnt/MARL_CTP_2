@@ -2,10 +2,44 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-if __name__ == "__main__":
-    # Plot box and whisker plot
 
-    # Plot bar graph
+def plot_box_and_whisker():
+    box_stats = [
+        {"whislo": 5, "q1": 10, "med": 15, "q3": 20, "whishi": 25},  # First box
+        {"whislo": 7, "q1": 12, "med": 18, "q3": 22, "whishi": 30},  # Second box
+        {"whislo": 3, "q1": 8, "med": 14, "q3": 19, "whishi": 27},  # Third box
+    ]
+
+    # Create the box plot
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.bxp(box_stats, showfliers=False)  # showfliers=False removes outliers
+
+    # Set labels
+    ax.set_title("Box and Whisker Plot of the Competitive Ratio")
+    ax.set_xlabel("Different Methods")
+    ax.set_ylabel("Competitive Ratio")
+    ax.set_xticklabels(["Set 1", "Set 2", "Set 3"])  # Label each dataset
+
+    # Show plot
+    current_directory = os.getcwd()
+    parent_dir = os.path.dirname(current_directory)
+    log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
+    plt.savefig(os.path.join(log_directory, "box_whisker.png"))
+    plt.close()
+
+
+def plot_multiple_learning_curves():
+    log_directory_names = ["log1", "log2", "log3"]
+
+    for log_directory in log_directory_names:
+        # Read values from csv files
+        pass
+
+        # Do rolling mean and std for each
+
+
+def plot_bar_graph():
+    # Problem: the legend being on the graph makes it hard to read the data
     # 10 nodes 2 agents 0.4 and 0.8
     # Data
     groups = ["0.4", "0.8"]  # 2 groups
@@ -63,3 +97,8 @@ if __name__ == "__main__":
     log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
     plt.savefig(os.path.join(log_directory, "bar_graph.png"))
     plt.close()
+
+
+if __name__ == "__main__":
+    plot_box_and_whisker()
+    # plot_bar_graph()

@@ -48,6 +48,7 @@ class PPO_2_Critic_Values:
         num_agents: int,
         reward_service_goal: float,
         individual_reward_weight: float,
+        individual_reward_weight_schedule: str,
     ) -> None:
         self.model = model
         self.environment = environment
@@ -69,6 +70,7 @@ class PPO_2_Critic_Values:
         self.num_agents = num_agents
         self.reward_service_goal = jnp.float16(reward_service_goal)
         self.individual_reward_weight = jnp.float16(individual_reward_weight)
+        self.individual_reward_weight_schedule = individual_reward_weight_schedule
 
     def _ent_coeff_schedule(self, loop_count):
         # linear or sigmoid or plateau schedule
@@ -92,6 +94,16 @@ class PPO_2_Critic_Values:
             operand=None,
         )
         return self.ent_coeff * frac
+
+    def _individual_reward_weight_schedule(self, loop_count):
+        # Constant or linear decay schedule
+        frac = jax.lax.cond(
+            self.individual_reward_weight_schedule == "constant",
+            lambda _: 1.0,
+            lambda _: 1.0 - loop_count / self.num_loops,
+            operand=None,
+        )
+        return self.individual_reward_weight * frac
 
     # return the actions for all agents
     @partial(jax.jit, static_argnums=(0,))
@@ -249,7 +261,7 @@ class PPO_2_Critic_Values:
 
     # This is currently the same as single agent
     @partial(jax.jit, static_argnums=(0,))
-    def calculate_gae(self, traj_batch, last_critic_val):
+    def calculate_gae(self, traj_batch, last_critic_val, loop_count):
         def _get_advantages(gae_and_next_value, transition: Transition):
             gae, next_value = gae_and_next_value
             done, critic_value, reward = (
@@ -292,7 +304,15 @@ class PPO_2_Critic_Values:
         )
         return advantages, advantages + traj_batch.critic_value
 
-    def _loss_fn(self, params, traj_batch: Transition, gae, targets, ent_coeff):
+    def _loss_fn(
+        self,
+        params,
+        traj_batch: Transition,
+        gae,
+        targets,
+        ent_coeff,
+        current_individual_reward_weight,
+    ):
         # RERUN NETWORK
         traj_batch_augmented_belief_state = jax.vmap(
             get_augmented_optimistic_pessimistic_belief
@@ -350,8 +370,8 @@ class PPO_2_Critic_Values:
 
         # Combine losses with weighting
         loss_actor = (
-            self.individual_reward_weight * individual_loss
-            + (1 - self.individual_reward_weight) * team_loss
+            current_individual_reward_weight * individual_loss
+            + (1 - current_individual_reward_weight) * team_loss
         ).mean()
 
         entropy = pi.entropy().mean()
@@ -385,10 +405,18 @@ class PPO_2_Critic_Values:
                 lambda _: self.ent_coeff,
                 operand=None,
             )
+            current_individual_reward_weight = self._individual_reward_weight_schedule(
+                loop_count
+            )
             rng, _rng = jax.random.split(rng)
             grad_fn = jax.value_and_grad(self._loss_fn, has_aux=True)
             total_loss, grads = grad_fn(
-                train_state.params, traj_batch, advantages, targets, ent_coeff
+                train_state.params,
+                traj_batch,
+                advantages,
+                targets,
+                ent_coeff,
+                current_individual_reward_weight,
             )
             train_state = train_state.apply_gradients(grads=grads)
             return train_state, total_loss

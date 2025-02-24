@@ -47,6 +47,7 @@ class PPO:
         num_agents: int,
         reward_service_goal: float,
         individual_reward_weight: float,
+        individual_reward_weight_schedule: str,
     ) -> None:
         self.model = model
         self.environment = environment
@@ -68,6 +69,7 @@ class PPO:
         self.num_agents = num_agents
         self.reward_service_goal = jnp.float16(reward_service_goal)
         self.individual_reward_weight = jnp.float16(individual_reward_weight)
+        self.individual_reward_weight_schedule = individual_reward_weight_schedule
 
     def _ent_coeff_schedule(self, loop_count):
         # linear or sigmoid or plateau schedule
@@ -91,6 +93,16 @@ class PPO:
             operand=None,
         )
         return self.ent_coeff * frac
+
+    def _individual_reward_weight_schedule(self, loop_count):
+        # Constant or linear decay schedule
+        frac = jax.lax.cond(
+            self.individual_reward_weight_schedule == "constant",
+            lambda _: 1.0,
+            lambda _: 1.0 - loop_count / self.num_loops,
+            operand=None,
+        )
+        return self.individual_reward_weight * frac
 
     # return the actions for all agents
     @partial(jax.jit, static_argnums=(0,))
@@ -248,7 +260,11 @@ class PPO:
 
     # This is currently the same as single agent
     @partial(jax.jit, static_argnums=(0,))
-    def calculate_gae(self, traj_batch, last_critic_val):
+    def calculate_gae(self, traj_batch, last_critic_val, loop_count):
+        current_individual_reward_weight = self._individual_reward_weight_schedule(
+            loop_count
+        )
+
         def _get_advantages(gae_and_next_value, transition: Transition):
             gae, next_value = gae_and_next_value
             done, critic_value, reward = (
@@ -259,8 +275,8 @@ class PPO:
             team_reward = jnp.sum(reward, axis=0)
             broadcasted_team_reward = jnp.broadcast_to(team_reward, reward.shape)
             reward = (
-                self.individual_reward_weight * reward
-                + (1 - self.individual_reward_weight) * broadcasted_team_reward
+                current_individual_reward_weight * reward
+                + (1 - current_individual_reward_weight) * broadcasted_team_reward
             )
             delta = (
                 reward + self.discount_factor * next_value * (1 - done) - critic_value

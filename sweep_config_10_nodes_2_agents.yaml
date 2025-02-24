@@ -23,4 +23,6 @@ parameters:
     max: 1
   num_critic_values:
     values: [1, 2]
+  anneal_individual_reward_weight:
+    values: ["constant", "linear"]
   
