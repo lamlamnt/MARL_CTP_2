@@ -17,7 +17,7 @@ parameters:
     max: -0.1
   optimizer_norm_clip:
     min: 0.5
-    max: 10
+    max: 10.0
   individual_reward_weight:
     min: 0.0
     max: 1.0
