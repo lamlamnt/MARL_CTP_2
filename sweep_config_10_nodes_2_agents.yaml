@@ -13,14 +13,14 @@ parameters:
     min: 0.05
     max: 0.25
   reward_fail_to_service_goal_larger_index:
-    min: -1
+    min: -1.0
     max: -0.1
   optimizer_norm_clip:
     min: 0.5
     max: 10
   individual_reward_weight:
-    min: 0
-    max: 1
+    min: 0.0
+    max: 1.0
   num_critic_values:
     values: [1, 2]
   anneal_individual_reward_weight:
