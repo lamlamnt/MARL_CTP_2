@@ -72,7 +72,7 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
     env_state_4, belief_state_4, rewards_4, done_4, subkey = environment.step(
         subkey, initial_env_state, initial_belief_states, jnp.array([2, 3])
     )
-    assert jnp.isclose(rewards_4, jnp.array([-0.1464, -0.854]), rtol=1e-3).all()
+    assert jnp.isclose(rewards_4, jnp.array([-0.1407, -0.821]), rtol=1e-3).all()
 
     # make sure positions are correct
     assert jnp.sum(env_state_4[0, :2, :]) == 2
@@ -86,7 +86,7 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
         subkey, env_state_4, belief_state_4, jnp.array([5, 2])
     )
     assert jnp.array_equal(done_5, jnp.array([True, False]))
-    assert jnp.isclose(rewards_5, jnp.array([-0.1, -0.89]), rtol=1e-2).all()
+    assert jnp.isclose(rewards_5, jnp.array([-0.1, -0.856]), rtol=1e-2).all()
     assert not jnp.array_equal(env_state_5[3, :, :], env_state_4[3, :, :])
     assert jnp.array_equal(env_state_5[3, :, :], belief_state_5[0, 3, :, :])
     assert jnp.array_equal(env_state_5[3, :, :], belief_state_5[1, 3, :, :])
@@ -106,7 +106,7 @@ def test_step(printer, environment: CTP_environment.MA_CTP_General):
     env_state_6, belief_state_6, rewards_6, done_6, subkey = environment.step(
         subkey, env_state_5, belief_state_5, jnp.array([0, 3])
     )
-    assert jnp.isclose(rewards_6, jnp.array([0, -0.89]), rtol=1e-2).all()
+    assert jnp.isclose(rewards_6, jnp.array([0, -0.856]), rtol=1e-2).all()
     assert jnp.array_equal(done_6, jnp.array([True, False]))
 
     # check symmetrical
@@ -144,7 +144,7 @@ def test_same_goal(printer, environment: CTP_environment.MA_CTP_General):
     env_state_1, belief_state_1, rewards_1, done_1, subkey = environment.step(
         subkey, initial_env_state, initial_belief_states, jnp.array([0, 0])
     )
-    assert jnp.isclose(rewards_1, jnp.array([-200, -0.207]), rtol=1e-3).all()
+    assert jnp.isclose(rewards_1, jnp.array([-200, -0.1991]), rtol=1e-3).all()
     env_state_2, belief_state_2, rewards_2, done_2, subkey = environment.step(
         subkey, env_state_1, belief_state_1, jnp.array([2, 2])
     )
@@ -196,7 +196,7 @@ def test_single_agent_working(printer):
     assert terminate_4 == jnp.bool_(True)
     assert jnp.isclose(reward_4[0], -0.1, rtol=1e-3)
     assert jnp.isclose(
-        reward_1[0] + reward_2[0] + reward_3[0] + reward_4[0], -1.1, rtol=1e-2
+        reward_1[0] + reward_2[0] + reward_3[0] + reward_4[0], -1.6422, rtol=1e-2
     )
 
 

@@ -12,7 +12,10 @@ from tqdm import tqdm
 
 sys.path.append("..")
 from Utils import graph_functions
-from Utils.normalize_add_expensive_edge import add_expensive_edge
+from Utils.normalize_add_expensive_edge import (
+    add_expensive_edge,
+    get_expected_optimal_total_cost,
+)
 from Utils.optimal_combination import get_optimal_combination_and_cost
 import os
 
@@ -87,6 +90,14 @@ class MA_CTP_General(MultiAgentEnv):
                 )
 
                 # Normalize the weights using the expected optimal path length under full observability
+                normalizing_factor = get_expected_optimal_total_cost(
+                    graph_realisation, key
+                )
+                graph_realisation.graph.weights = jnp.where(
+                    graph_realisation.graph.weights != CTP_generator.NOT_CONNECTED,
+                    graph_realisation.graph.weights / normalizing_factor,
+                    CTP_generator.NOT_CONNECTED,
+                )
 
                 # Store the matrix of weights, blocking probs, and origin/goal
                 self.stored_graphs = self.stored_graphs.at[i, 0, :, :].set(
@@ -142,16 +153,6 @@ class MA_CTP_General(MultiAgentEnv):
             blocking_status,
             graph_origins,
             graph_goals,
-        )
-
-        # If don't normalize using full observability, can normalize here, after adding expensive edge
-        _, normalizing_factor = get_optimal_combination_and_cost(
-            graph_weights, blocking_status, graph_origins, graph_goals, self.num_agents
-        )
-        graph_weights = jnp.where(
-            graph_weights != CTP_generator.NOT_CONNECTED,
-            graph_weights / normalizing_factor,
-            CTP_generator.NOT_CONNECTED,
         )
 
         env_state = self.__convert_graph_realisation_to_state(

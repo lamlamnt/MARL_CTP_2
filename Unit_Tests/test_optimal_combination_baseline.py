@@ -37,7 +37,7 @@ def test_get_optimal_combination_and_cost(
         2,
     )
     assert best_combination.shape == (2,)
-    assert jnp.isclose(best_combination_cost, 1, rtol=1e-2)
+    assert jnp.isclose(best_combination_cost, 0.9617, rtol=1e-2)
     assert jnp.array_equal(best_combination, jnp.array([0, 1]))
 
 
@@ -141,7 +141,7 @@ def test_optimistic_agent_full_episode(
     total_cost = optimistic_agent.get_total_cost(
         environment, initial_belief_states, initial_env_state, key
     )
-    assert jnp.isclose(total_cost, 1.2, rtol=1e-2)
+    assert jnp.isclose(total_cost, 1.161, rtol=1e-2)
 
 
 # test get_optimal_combination_and_cost for 3 agents
@@ -160,7 +160,7 @@ def test_get_optimal_combination_and_cost_3_agents(printer):
         3,
     )
     assert best_combination.shape == (3,)
-    assert jnp.isclose(best_combination_cost, 1, rtol=1e-2)
+    assert jnp.isclose(best_combination_cost, 0.899, rtol=1e-2)
     assert jnp.array_equal(best_combination, jnp.array([0, 1, 2]))
 
 

@@ -5,11 +5,10 @@ import sys
 
 sys.path.append("..")
 from Environment import CTP_generator
+from Utils import graph_functions
+from Utils.optimal_combination import get_optimal_combination_and_cost
 
-
-# Normalize by the total cost/num_agents (if is unstable, can try normalize by total cost)
-def normalize(weights: jnp.ndarray, num_agents: int) -> jnp.ndarray:
-    pass
+NUM_SAMPLES_FACTOR = 10
 
 
 # Check solvability and add expensive edge in one go
@@ -156,3 +155,33 @@ def get_solvability_matrix(
         _origin_goal_pair_is_solvable, in_axes=(None, None, None, None, 0)
     )(weights, blocking_status, origins, goals, jnp.arange(num_agents))
     return solvability_matrix
+
+
+def get_expected_optimal_total_cost(
+    graphRealisation: CTP_generator.CTPGraph_Realisation, key: jax.random.PRNGKey
+) -> float:
+    # Sample blocking status for several times and get the average path length
+    num_agents = graphRealisation.graph.num_agents
+    num_samples = NUM_SAMPLES_FACTOR * graphRealisation.graph.n_nodes
+    many_keys = jax.random.split(key, num=num_samples)
+
+    def get_sampled_optimal_cost_for_one_instance(key):
+        blocking_status = graphRealisation.sample_blocking_status(key)
+        graph_weights, graph_blocking_prob, blocking_status = add_expensive_edge(
+            graphRealisation.graph.weights,
+            graphRealisation.graph.blocking_prob,
+            blocking_status,
+            graphRealisation.graph.origin,
+            graphRealisation.graph.goal,
+        )
+        _, one_normalizing_factor = get_optimal_combination_and_cost(
+            graph_weights,
+            blocking_status,
+            graphRealisation.graph.origin,
+            graphRealisation.graph.goal,
+            num_agents,
+        )
+        return one_normalizing_factor
+
+    normalizing_factor = jax.vmap(get_sampled_optimal_cost_for_one_instance)(many_keys)
+    return jnp.mean(normalizing_factor)

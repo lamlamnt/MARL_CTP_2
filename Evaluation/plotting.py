@@ -44,7 +44,10 @@ def plot_learning_curve(testing_average_competitive_ratio, log_directory, args):
 
     # Store the learning curve values (the Pandas series) in a .csv file
     learning_curve_series.to_csv(
-        os.path.join(log_directory, "learning_curve_series.csv"), index=False
+        os.path.join(log_directory, "learning_curve_series.csv"),
+        index=False,
+        encoding="utf-8",
+        na_rep="MISSING",
     )
 
 
