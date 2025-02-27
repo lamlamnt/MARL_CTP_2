@@ -7,3 +7,10 @@ import distrax
 import sys
 
 sys.path.append("..")
+
+
+class Autoencoder(nn.Module):
+    hidden_size: int
+    latent_size: int
+
+    pass

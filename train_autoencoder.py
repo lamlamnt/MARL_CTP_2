@@ -14,23 +14,20 @@ sys.path.append("..")
 from Environment.CTP_environment import MA_CTP_General, CTP_generator
 from Utils.load_store_graphs import load_graphs
 from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
+from Auto_encoder_related.ppo_agent import PPO_agent_collect_belief_states
+from Networks.densenet import (
+    DenseNet_ActorCritic,
+    DenseNet_ActorCritic_Same,
+    DenseNet_ActorCritic_2_Critic_Values,
+    DenseNet_ActorCritic_Same_2_Critic_Values,
+)
+from Networks.autoencoder import Autoencoder
+import flax.linen as nn
+from jax_tqdm import scan_tqdm
+from flax.training.train_state import TrainState
+import time
 
-
-@partial(jax.jit, static_argnums=(0,))
-def act(model, key, params, belief_states) -> tuple[jnp.array, jax.random.PRNGKey]:
-    augmented_belief_states = get_augmented_optimistic_pessimistic_belief(belief_states)
-
-    def _choose_action(belief_state):
-        pi, _ = model.apply(params, belief_state)
-        random_action = pi.sample(
-            seed=key
-        )  # use the same key for all agents (maybe not good)
-        return random_action
-
-    # Because we want diverse states, so will use non-deterministic inference policy
-    actions = jax.vmap(_choose_action, in_axes=0)(augmented_belief_states)
-    old_key, new_key = jax.random.split(key)
-    return actions, new_key
+NUM_CHANNELS_IN_BELIEF_STATE = 6
 
 
 def main():
@@ -39,11 +36,17 @@ def main():
     if not os.path.exists(log_directory):
         os.makedirs(log_directory)
 
+    state_shape = (
+        NUM_CHANNELS_IN_BELIEF_STATE,
+        args.n_agent + args.n_node,
+        args.n_node,
+    )
+
     # Create 2 environments (training and testing)
     # Determine belief state shape
-    key = jax.random.PRNGKey(args.random_seed_for_training)
-    subkeys = jax.random.split(key, num=2)
-    inference_key, environment_key = subkeys
+    key = jax.random.PRNGKey(args.random_seed)
+    subkeys = jax.random.split(key, num=3)
+    inference_key, environment_key, online_key = subkeys
     environment = MA_CTP_General(
         args.n_agent,
         args.n_node,
@@ -71,22 +74,113 @@ def main():
         loaded_graphs=inference_graphs,
     )
 
-    # Load in trained network. Don't need PPO agent because we just need the act function
+    # Load in trained network.
     network_file_path = os.path.join(
         current_directory, "Logs", args.load_network_directory, "weights.flax"
     )
     with open(network_file_path, "rb") as f:
-        init_params = flax.serialization.from_bytes(init_params, f.read())
+        ppo_init_params = flax.serialization.from_bytes(init_params, f.read())
     optimizer = optax.chain(
         optax.adam(learning_rate=args.learning_rate, eps=1e-5),
+    )
+
+    if args.network_type == "Densenet" and args.num_critic_values == 1:
+        ppo_model = DenseNet_ActorCritic(
+            args.n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    elif args.network_type == "Densenet_Same" and args.num_critic_values == 1:
+        ppo_model = DenseNet_ActorCritic_Same(
+            args.n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    elif args.network_type == "Densenet" and args.num_critic_values == 2:
+        ppo_model = DenseNet_ActorCritic_2_Critic_Values(
+            args.n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    else:
+        ppo_model = DenseNet_ActorCritic_Same_2_Critic_Values(
+            args.n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+
+    ppo_agent = PPO_agent_collect_belief_states(
+        ppo_model,
+        environment,
+        args.horizon_length,
+        args.reward_exceed_horizon,
+        args.n_agent,
+    )
+    ppo_train_state = TrainState.create(
+        apply_fn=ppo_model.apply,
+        params=ppo_init_params,
+        tx=optimizer,
+    )
+
+    # Initialize autoencoder
+    autoencoder_model = Autoencoder(
+        hidden_size=128,
+        latent_size=64,
+    )
+    autoencoder_init_params = autoencoder_model.init(
+        jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
+    )
+    autoencoder_train_state = TrainState.create(
+        apply_fn=autoencoder_model.apply,
+        params=autoencoder_init_params,
+        tx=optimizer,
+    )
+    init_key, env_action_key, evaluate_key = jax.vmap(jax.random.PRNGKey)(
+        jnp.arange(3) + args.random_seed
     )
 
     print("Start training ...")
 
     # Want random action but with invalid action masked out (add later)
-    # Collect new trajectories every epoch?
-    # Evaluate results - plot loss and store final loss in json file. Testing set
-    pass
+    # Collect new trajectories every epoch because not enough memory to store so much.
+    @scan_tqdm(args.num_epochs)
+    def _update_step(runner_state, unused):
+        # Collect trajectories
+        runner_state, traj_batch = jax.lax.scan(
+            ppo_agent.env_step, runner_state, None, args.num_steps_to_collect
+        )
+        # Update encoder
+
+    start_training_time = time.time()
+    new_env_state, new_belief_states = environment.reset(init_key)
+    timestep_in_episode = jnp.int32(0)
+    runner_state = (
+        ppo_train_state,
+        autoencoder_train_state,
+        new_env_state,
+        new_belief_states,
+        env_action_key,
+        timestep_in_episode,
+        jnp.bool_(True),
+    )
+    autoencoder_train_state, metrics = jax.lax.scan(
+        _update_step, runner_state, jnp.arange(args.num_epochs)
+    )
+
+    print("Start evaluation of trained autoencoder ...")
+    # Evaluate results using testing set - plot loss and store final loss in json file.
 
 
 if __name__ == "__main__":
@@ -161,6 +255,13 @@ if __name__ == "__main__":
         help="Options: Densenet,Densenet_Same",
         default="Densenet_Same",
     )
+    parser.add_argument(
+        "--num_critic_values",
+        type=int,
+        required=False,
+        default=1,
+        help="Options: only 1 or 2. 2 means it tries to estimate both the individual and team reward",
+    )
     parser.add_argument("--densenet_bn_size", type=int, required=False, default=4)
     parser.add_argument("--densenet_growth_rate", type=int, required=False, default=32)
     parser.add_argument(
@@ -192,6 +293,13 @@ if __name__ == "__main__":
         default=200,
     )
     parser.add_argument("--learning_rate", type=float, required=False, default=0.001)
+    parser.add_argument(
+        "--num_steps_to_collect",
+        type=int,
+        help="Number of environment steps to collect before updating the encoder",
+        required=False,
+        default=2000,
+    )
 
     # Args related to running/managing experiments
     parser.add_argument(
