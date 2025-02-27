@@ -10,6 +10,7 @@ import pytest_print as pp
 import os
 import warnings
 from Utils.normalize_add_expensive_edge import get_expected_optimal_total_cost
+from Utils.hand_crafted_graphs import get_go_past_goal_without_servicing_graph
 
 
 @pytest.fixture
@@ -37,3 +38,19 @@ def test_reset_normalize(printer, environment):
     initial_env_state, initial_belief_states = environment.reset(subkey1)
     next_env_state, next_belief_states = environment.reset(subkey2)
     assert jnp.array_equal(initial_env_state[1, 2:, :], next_env_state[1, 2:, :])
+
+
+# Hand-crafted graphs should not be normalized
+def test_handcrafted_normalize(printer):
+    key = jax.random.PRNGKey(101)
+    n_node, defined_graph = get_go_past_goal_without_servicing_graph()
+    environment = CTP_environment.MA_CTP_General(
+        2,
+        n_node,
+        key,
+        prop_stoch=0.4,
+        num_stored_graphs=1,
+        loaded_graphs=defined_graph,
+    )
+    initial_env_state, initial_belief_states = environment.reset(key)
+    assert jnp.array_equal(initial_env_state[1, 2:, :], defined_graph[0, 0, :, :])

@@ -47,7 +47,6 @@ def plot_learning_curve(testing_average_competitive_ratio, log_directory, args):
         os.path.join(log_directory, "learning_curve_series.csv"),
         index=False,
         encoding="utf-8",
-        na_rep="MISSING",
     )
 
 

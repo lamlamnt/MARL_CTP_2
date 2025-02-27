@@ -184,4 +184,4 @@ def get_expected_optimal_total_cost(
         return one_normalizing_factor
 
     normalizing_factor = jax.vmap(get_sampled_optimal_cost_for_one_instance)(many_keys)
-    return jnp.mean(normalizing_factor)
+    return jnp.mean(normalizing_factor, dtype=jnp.float16)
