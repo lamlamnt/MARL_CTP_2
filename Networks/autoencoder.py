@@ -22,25 +22,44 @@ class Encoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
         x = nn.relu(x)
 
         # Flatten
-        x = x.reshape((x.shape[0], -1))
+        x = x.reshape(x.shape[0], -1, x.shape[-1])
+        print(x.shape)
 
-        # 2 1d convolutional layers
+        # 3 1d convolutional layers
         x = nn.Conv(
             self.hidden_size // 2,
-            kernel_size=(2,),
+            kernel_size=(4,),
+            strides=(2,),
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
         x = nn.relu(x)
+        print(x.shape)
         x = nn.Conv(
             self.hidden_size // 4,
-            kernel_size=(2,),
+            kernel_size=(4,),
+            strides=(2,),
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
+        x = nn.relu(x)
+        x = nn.Conv(
+            self.hidden_size // 8,
+            kernel_size=(4,),
+            kernel_init=nn.initializers.kaiming_normal(),
+            bias_init=constant(0.0),
+        )(x)
+        print(x.shape)
+        x = nn.relu(x)
+
+        # Flatten first
+        x = x.reshape(x.shape[0], -1)
+        print(x.shape)
 
         # 1 Dense layers
         x = nn.Dense(
@@ -48,48 +67,74 @@ class Encoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
         return x
 
 
 class Decoder(nn.Module):
+    size_first_layer: int
     hidden_size: int
     output_size: tuple
 
     @nn.compact
     def __call__(self, x):
+        # use input size to determine this 180 number -> 12x10//4
         # 1 Dense layers
         x = nn.Dense(
-            self.hidden_size // 4,
+            self.size_first_layer,
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
         x = nn.relu(x)
+
+        # Turn into 2d
+        x = x.reshape(x.shape[0], -1, self.hidden_size // 8)
+        print(x.shape)
 
         # 2 1d convolutional layers
         x = nn.ConvTranspose(
-            self.hidden_size // 2,
-            kernel_size=(2,),
+            self.hidden_size // 4,
+            kernel_size=(4,),
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
+        x = nn.relu(x)
+        x = nn.ConvTranspose(
+            self.hidden_size // 2,
+            kernel_size=(4,),
+            strides=(2,),
+            kernel_init=nn.initializers.kaiming_normal(),
+            bias_init=constant(0.0),
+        )(x)
+        print(x.shape)
         x = nn.relu(x)
         x = nn.ConvTranspose(
             self.hidden_size,
-            kernel_size=(2,),
+            kernel_size=(4,),
+            strides=(2,),
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
 
         # Reshape/unflatten
-        x = x.reshape(self.output_size)
+        x = x.reshape(x.shape[0], self.output_size[1], self.output_size[2], x.shape[-1])
+        print(x.shape)
 
         # 1x1 CNN layer
         x = nn.ConvTranspose(
-            self.output_size,
+            self.output_size[0],
             kernel_size=(1, 1),
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
+        print(x.shape)
+
+        # Transpose back to original shape
+        x = jnp.transpose(x, (0, 3, 1, 2))
+        print(x.shape)
         return x
 
 
@@ -99,10 +144,19 @@ class Autoencoder(nn.Module):
     output_size: tuple  # Output_size the same as input_size
 
     def setup(self):
+        size_first_layer_decoder = (
+            (self.output_size[1] * self.output_size[2]) * self.hidden_size // 8
+        ) // 4
         self.encoder = Encoder(self.hidden_size, self.latent_size)
-        self.decoder = Decoder(self.hidden_size, self.output_size)
+        self.decoder = Decoder(
+            size_first_layer_decoder, self.hidden_size, self.output_size
+        )
+
+    def encoder(self, x):
+        return self.encoder(x)
 
     def __call__(self, x):
+        x = jnp.transpose(x, (0, 2, 3, 1))
         z = self.encoder(x)  # Encode input to latent space
         z = self.decoder(z)  # Decode latent representation back to data space
         return z
