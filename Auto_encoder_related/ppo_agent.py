@@ -51,7 +51,6 @@ class PPO_agent_collect_belief_states:
             current_belief_states,
             key,
             timestep_in_episode,
-            previous_episode_dones,
         ) = runner_state
         action_key, env_key = jax.random.split(key, 2)
 
@@ -116,6 +115,5 @@ class PPO_agent_collect_belief_states:
             new_belief_states,
             env_key,
             timestep_in_episode,
-            episode_done,
         )
         return runner_state, current_belief_states

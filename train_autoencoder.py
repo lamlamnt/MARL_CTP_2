@@ -26,6 +26,7 @@ import flax.linen as nn
 from jax_tqdm import scan_tqdm
 from flax.training.train_state import TrainState
 import time
+from Auto_encoder_related.training_step import train_step, loss_fn
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -75,15 +76,6 @@ def main():
     )
 
     # Load in trained network.
-    network_file_path = os.path.join(
-        current_directory, "Logs", args.load_network_directory, "weights.flax"
-    )
-    with open(network_file_path, "rb") as f:
-        ppo_init_params = flax.serialization.from_bytes(init_params, f.read())
-    optimizer = optax.chain(
-        optax.adam(learning_rate=args.learning_rate, eps=1e-5),
-    )
-
     if args.network_type == "Densenet" and args.num_critic_values == 1:
         ppo_model = DenseNet_ActorCritic(
             args.n_node,
@@ -120,10 +112,31 @@ def main():
             growth_rate=args.densenet_growth_rate,
             num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
         )
+    network_file_path = os.path.join(
+        current_directory, "Logs", args.load_network_directory, "weights.flax"
+    )
+    with open(network_file_path, "rb") as f:
+        ppo_init_params = ppo_model.init(
+            jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
+        )
+        ppo_init_params = flax.serialization.from_bytes(ppo_init_params, f.read())
+
+    optimizer = optax.chain(
+        optax.adamw(
+            learning_rate=args.learning_rate, eps=1e-5, weight_decay=args.weight_decay
+        ),
+    )
 
     ppo_agent = PPO_agent_collect_belief_states(
         ppo_model,
         environment,
+        args.horizon_length,
+        args.reward_exceed_horizon,
+        args.n_agent,
+    )
+    testing_ppo_agent = PPO_agent_collect_belief_states(
+        ppo_model,
+        testing_environment,
         args.horizon_length,
         args.reward_exceed_horizon,
         args.n_agent,
@@ -151,17 +164,49 @@ def main():
         jnp.arange(3) + args.random_seed
     )
 
+    # Use the testing environment to collect a validation set (used for all epochs)
+    _, validation_set = jax.lax.scan(
+        testing_ppo_agent.env_step, runner_state, None, args.validation_set_size
+    )
+
     print("Start training ...")
 
     # Want random action but with invalid action masked out (add later)
     # Collect new trajectories every epoch because not enough memory to store so much.
     @scan_tqdm(args.num_epochs)
     def _update_step(runner_state, unused):
-        # Collect trajectories
+        # Collect trajectories.
         runner_state, traj_batch = jax.lax.scan(
             ppo_agent.env_step, runner_state, None, args.num_steps_to_collect
         )
+        (
+            ppo_train_state,
+            autoencoder_train_state,
+            new_env_state,
+            new_belief_states,
+            env_key,
+            timestep_in_episode,
+        ) = runner_state
         # Update encoder
+        autoencoder_train_state, training_loss = train_step(
+            autoencoder_train_state, traj_batch
+        )
+
+        runner_state = (
+            ppo_train_state,
+            autoencoder_train_state,
+            new_env_state,
+            new_belief_states,
+            env_key,
+            timestep_in_episode,
+        )
+
+        # Perform inference on validation set to plot learning curve
+        validation_loss = loss_fn(
+            autoencoder_model, autoencoder_train_state.params, validation_set
+        )
+        metrics = {"training_loss": training_loss, "validation_loss": validation_loss}
+        return runner_state, metrics
 
     start_training_time = time.time()
     new_env_state, new_belief_states = environment.reset(init_key)
@@ -173,14 +218,14 @@ def main():
         new_belief_states,
         env_action_key,
         timestep_in_episode,
-        jnp.bool_(True),
     )
     autoencoder_train_state, metrics = jax.lax.scan(
         _update_step, runner_state, jnp.arange(args.num_epochs)
     )
 
     print("Start evaluation of trained autoencoder ...")
-    # Evaluate results using testing set - plot loss and store final loss in json file.
+    # Evaluate results using testing set - plot loss and store final loss and args in json file.
+    # Store encoder weights in a file
 
 
 if __name__ == "__main__":
@@ -283,6 +328,7 @@ if __name__ == "__main__":
         default=None,
         help="Directory to load trained network weights from",
     )
+    parser.add_argument("--encoder_weights_file", type=str, required=True, default=None)
 
     # Hyperparameters relating to training the autoencoder
     parser.add_argument(
@@ -299,6 +345,16 @@ if __name__ == "__main__":
         help="Number of environment steps to collect before updating the encoder",
         required=False,
         default=2000,
+    )
+    parser.add_argument("--weight_decay", type=float, required=False, default=0.0001)
+
+    # Args related to evaluation
+    parser.add_argument(
+        "--validation_set_size",
+        type=int,
+        help="Number of different belief states to use for validation",
+        required=False,
+        default=1000,
     )
 
     # Args related to running/managing experiments
