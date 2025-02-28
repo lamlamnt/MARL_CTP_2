@@ -473,7 +473,7 @@ if __name__ == "__main__":
         type=float,
         required=False,
         help="optimizer.clip_by_global_norm(value)",
-        default=0.5,
+        default=2,
     )
 
     # Args related to running/managing experiments
@@ -659,9 +659,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--anneal_individual_reward_weight",
         type=str,
-        default="constant",
+        default="linear",
         required=False,
-        help="Options: constant, linear_decay. The arg individual_reward_weight is the starting weight. Constant or linear annealing to 0.0 over time during training",
+        help="Options: constant, linear. The arg individual_reward_weight is the starting weight. Constant or linear annealing to 0.0 over time during training",
     )
 
     args = parser.parse_args()

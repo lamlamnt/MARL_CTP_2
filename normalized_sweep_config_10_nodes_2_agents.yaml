@@ -1,0 +1,21 @@
+method: bayes               
+metric:
+  name: average_competitive_ratio    
+  goal: minimize           
+parameters:
+  clip_eps:
+    min: 0.06
+    max: 0.18
+  vf_coeff:
+    min: 0.1
+    max: 0.23
+  ent_coeff:
+    min: 0.05
+    max: 0.15
+  reward_fail_to_service_goal_larger_index:
+    min: -0.8
+    max: -0.2
+  individual_reward_weight:
+    min: 0.2
+    max: 0.7
+  
