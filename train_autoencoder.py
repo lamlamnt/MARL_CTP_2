@@ -181,6 +181,7 @@ def main(args):
     _, validation_set = jax.lax.scan(
         testing_ppo_agent.env_step, runner_state, None, args.validation_set_size
     )
+    validation_set = jnp.reshape(validation_set, (-1,) + validation_set.shape[2:])
 
     print("Start training ...")
 
@@ -228,7 +229,7 @@ def main(args):
 
     print("Start evaluation of trained autoencoder ...")
     # Evaluate results using testing set - plot loss and store final loss and args in json file.
-    # Store encoder weights in a file
+    # Store autoencoder weights in a file
 
 
 if __name__ == "__main__":
