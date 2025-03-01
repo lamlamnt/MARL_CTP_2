@@ -114,7 +114,7 @@ def main(args):
             reward_for_invalid_action=args.reward_for_invalid_action,
             reward_service_goal=args.reward_service_goal,
             reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
-            num_stored_graphs=args.num_stored_graphs,
+            num_stored_graphs=num_training_graphs,
             loaded_graphs=training_graphs,
         )
 
@@ -135,7 +135,7 @@ def main(args):
             reward_for_invalid_action=args.reward_for_invalid_action,
             reward_service_goal=args.reward_service_goal,
             reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
-            num_stored_graphs=args.num_stored_graphs,
+            num_stored_graphs=num_inference_graphs,
             loaded_graphs=inference_graphs,
         )
 
@@ -507,6 +507,13 @@ if __name__ == "__main__":
         required=False,
         help="Whether to use yaml file to do hyperparameter sweep (Bayesian optimization)",
     )
+    parser.add_argument(
+        "--wandb_sweep_id",
+        type=str,
+        required=False,
+        default=None,
+        help="ID of a sweep in progress - to resume a sweep",
+    )
     parser.add_argument("--sweep_run_count", type=int, required=False, default=3)
     parser.add_argument(
         "--factor_inference_timesteps",
@@ -696,11 +703,14 @@ if __name__ == "__main__":
             raise ValueError("Wandb mode must be online for hyperparameter sweep")
         with open(args.yaml_file, "r") as file:
             sweep_config = yaml.safe_load(file)
-        sweep_id = wandb.sweep(
-            sweep_config,
-            project=args.wandb_project_name,
-            entity="lam-lam-university-of-oxford",
-        )
+        if args.wandb_sweep_id is None:
+            sweep_id = wandb.sweep(
+                sweep_config,
+                project=args.wandb_project_name,
+                entity="lam-lam-university-of-oxford",
+            )
+        else:
+            sweep_id = "lam-lam-university-of-oxford/" + args.wandb_sweep_id
 
         def wrapper_function():
             with wandb.init() as run:

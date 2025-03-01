@@ -31,7 +31,7 @@ from Auto_encoder_related.training_step import train_step, loss_fn
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
 
-def main():
+def main(args):
     current_directory = os.getcwd()
     log_directory = os.path.join(current_directory, "Logs", args.log_directory)
     if not os.path.exists(log_directory):
@@ -58,7 +58,7 @@ def main():
         reward_for_invalid_action=args.reward_for_invalid_action,
         reward_service_goal=args.reward_service_goal,
         reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
-        num_stored_graphs=args.num_stored_graphs,
+        num_stored_graphs=num_training_graphs,
         loaded_graphs=training_graphs,
     )
     testing_environment = MA_CTP_General(
@@ -71,7 +71,7 @@ def main():
         reward_for_invalid_action=args.reward_for_invalid_action,
         reward_service_goal=args.reward_service_goal,
         reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
-        num_stored_graphs=args.num_stored_graphs,
+        num_stored_graphs=num_inference_graphs,
         loaded_graphs=inference_graphs,
     )
 
@@ -130,14 +130,14 @@ def main():
     ppo_agent = PPO_agent_collect_belief_states(
         ppo_model,
         environment,
-        args.horizon_length,
+        args.horizon_length_factor * args.n_node,
         args.reward_exceed_horizon,
         args.n_agent,
     )
     testing_ppo_agent = PPO_agent_collect_belief_states(
         ppo_model,
         testing_environment,
-        args.horizon_length,
+        args.horizon_length_factor * args.n_node,
         args.reward_exceed_horizon,
         args.n_agent,
     )
@@ -148,12 +148,15 @@ def main():
     )
 
     # Initialize autoencoder
+    latent_size = 18 * args.n_node - 30 + args.n_node * args.n_agent
     autoencoder_model = Autoencoder(
-        hidden_size=128,
-        latent_size=64,
+        hidden_size=args.hidden_size,
+        latent_size=latent_size,
+        output_size=state_shape,
     )
     autoencoder_init_params = autoencoder_model.init(
-        jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
+        jax.random.PRNGKey(0),
+        jax.random.normal(online_key, (1,) + state_shape),
     )
     autoencoder_train_state = TrainState.create(
         apply_fn=autoencoder_model.apply,
@@ -162,6 +165,16 @@ def main():
     )
     init_key, env_action_key, evaluate_key = jax.vmap(jax.random.PRNGKey)(
         jnp.arange(3) + args.random_seed
+    )
+    new_env_state, new_belief_states = environment.reset(init_key)
+    timestep_in_episode = jnp.int32(0)
+    runner_state = (
+        ppo_train_state,
+        autoencoder_train_state,
+        new_env_state,
+        new_belief_states,
+        env_action_key,
+        timestep_in_episode,
     )
 
     # Use the testing environment to collect a validation set (used for all epochs)
@@ -189,7 +202,7 @@ def main():
         ) = runner_state
         # Update encoder
         autoencoder_train_state, training_loss = train_step(
-            autoencoder_train_state, traj_batch
+            autoencoder_model, autoencoder_train_state, traj_batch
         )
 
         runner_state = (
@@ -209,16 +222,6 @@ def main():
         return runner_state, metrics
 
     start_training_time = time.time()
-    new_env_state, new_belief_states = environment.reset(init_key)
-    timestep_in_episode = jnp.int32(0)
-    runner_state = (
-        ppo_train_state,
-        autoencoder_train_state,
-        new_env_state,
-        new_belief_states,
-        env_action_key,
-        timestep_in_episode,
-    )
     autoencoder_train_state, metrics = jax.lax.scan(
         _update_step, runner_state, jnp.arange(args.num_epochs)
     )
@@ -260,7 +263,7 @@ if __name__ == "__main__":
         "--reward_fail_to_service_goal_larger_index",
         type=float,
         required=False,
-        default=-0.1,
+        default=-0.5,
     )
     parser.add_argument(
         "--reward_exceed_horizon",
@@ -320,15 +323,18 @@ if __name__ == "__main__":
         "--graph_identifier",
         type=str,
         required=False,
-        default="node_10_agent_2_prop_0.4",
+        default="normalized_node_10_agent_2_prop_0.8",
     )
     parser.add_argument(
         "--load_network_directory",
         type=str,
         default=None,
-        help="Directory to load trained network weights from",
+        required=True,
+        help="Directory to load trained network weights for ppo from",
     )
-    parser.add_argument("--encoder_weights_file", type=str, required=True, default=None)
+    parser.add_argument(
+        "--autoencoder_weights_file", type=str, required=True, default=None
+    )
 
     # Hyperparameters relating to training the autoencoder
     parser.add_argument(
@@ -347,6 +353,13 @@ if __name__ == "__main__":
         default=2000,
     )
     parser.add_argument("--weight_decay", type=float, required=False, default=0.0001)
+    parser.add_argument(
+        "--hidden_size",
+        type=int,
+        required=False,
+        default=48,
+        help="Number of channels of the first convolutional layer in the encoder",
+    )
 
     # Args related to evaluation
     parser.add_argument(

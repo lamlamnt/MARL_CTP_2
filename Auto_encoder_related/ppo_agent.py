@@ -116,4 +116,4 @@ class PPO_agent_collect_belief_states:
             env_key,
             timestep_in_episode,
         )
-        return runner_state, current_belief_states
+        return runner_state, augmented_belief_states

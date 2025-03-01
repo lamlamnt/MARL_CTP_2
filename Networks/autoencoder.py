@@ -16,18 +16,19 @@ class Encoder(nn.Module):
     @nn.compact
     def __call__(self, x):
         # 1x1 CNN layer
+        x = jnp.transpose(x, (0, 2, 3, 1))
         x = nn.Conv(
             self.hidden_size,
             kernel_size=(1, 1),
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.relu(x)
 
         # Flatten
         x = x.reshape(x.shape[0], -1, x.shape[-1])
-        print(x.shape)
+        # print(x.shape)
 
         # 3 1d convolutional layers
         x = nn.Conv(
@@ -38,7 +39,7 @@ class Encoder(nn.Module):
             bias_init=constant(0.0),
         )(x)
         x = nn.relu(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.Conv(
             self.hidden_size // 4,
             kernel_size=(4,),
@@ -46,7 +47,7 @@ class Encoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.relu(x)
         x = nn.Conv(
             self.hidden_size // 8,
@@ -54,12 +55,12 @@ class Encoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.relu(x)
 
         # Flatten first
         x = x.reshape(x.shape[0], -1)
-        print(x.shape)
+        # print(x.shape)
 
         # 1 Dense layers
         x = nn.Dense(
@@ -67,7 +68,7 @@ class Encoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         return x
 
 
@@ -85,12 +86,12 @@ class Decoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.relu(x)
 
         # Turn into 2d
         x = x.reshape(x.shape[0], -1, self.hidden_size // 8)
-        print(x.shape)
+        # print(x.shape)
 
         # 2 1d convolutional layers
         x = nn.ConvTranspose(
@@ -99,7 +100,7 @@ class Decoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.relu(x)
         x = nn.ConvTranspose(
             self.hidden_size // 2,
@@ -108,7 +109,7 @@ class Decoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
         x = nn.relu(x)
         x = nn.ConvTranspose(
             self.hidden_size,
@@ -117,11 +118,11 @@ class Decoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
 
         # Reshape/unflatten
         x = x.reshape(x.shape[0], self.output_size[1], self.output_size[2], x.shape[-1])
-        print(x.shape)
+        # print(x.shape)
 
         # 1x1 CNN layer
         x = nn.ConvTranspose(
@@ -130,11 +131,11 @@ class Decoder(nn.Module):
             kernel_init=nn.initializers.kaiming_normal(),
             bias_init=constant(0.0),
         )(x)
-        print(x.shape)
+        # print(x.shape)
 
         # Transpose back to original shape
         x = jnp.transpose(x, (0, 3, 1, 2))
-        print(x.shape)
+        # print(x.shape)
         return x
 
 
@@ -152,11 +153,9 @@ class Autoencoder(nn.Module):
             size_first_layer_decoder, self.hidden_size, self.output_size
         )
 
-    def encoder(self, x):
-        return self.encoder(x)
-
     def __call__(self, x):
-        x = jnp.transpose(x, (0, 2, 3, 1))
-        z = self.encoder(x)  # Encode input to latent space
-        z = self.decoder(z)  # Decode latent representation back to data space
-        return z
+        latent_representation = self.encoder(x)  # Encode input to latent space
+        reconstructed = self.decoder(
+            latent_representation
+        )  # Decode latent representation back to data space
+        return latent_representation, reconstructed

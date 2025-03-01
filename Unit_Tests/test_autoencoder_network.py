@@ -8,9 +8,21 @@ sys.path.append("..")
 from Networks.autoencoder import Encoder, Decoder, Autoencoder
 from flax.training.train_state import TrainState
 import optax
+import os
+import flax
 
-# def test_autoencoder(printer):
-if __name__ == "__main__":
+
+def extract_params(params, prefix=""):
+    """Recursively extract layer names and weights from a parameter dictionary."""
+    for name, value in params.items():
+        full_name = f"{prefix}/{name}" if prefix else name
+        if isinstance(value, dict):  # If the value is a nested dictionary, recurse
+            yield from extract_params(value, prefix=full_name)
+        else:  # If the value is a weight array, yield it
+            yield full_name, value
+
+
+def test_autoencoder(printer):
     n_nodes = 10
     n_agents = 2
     output_size = (6, 12, 10)
@@ -19,22 +31,6 @@ if __name__ == "__main__":
     key = jax.random.PRNGKey(100)
     params = autoencoder_model.init(key, jnp.ones((1, 6, 12, 10)))
     x = jnp.ones((5, 6, 12, 10))
-    x_recon = autoencoder_model.apply(params, x)
+    x_latent, x_recon = autoencoder_model.apply(params, x)
     assert x_recon.shape == (5, 6, 12, 10)
-
-    # test apply encoder
-    optimizer = optax.chain(
-        optax.adamw(learning_rate=0.001, eps=1e-5, weight_decay=0.0001),
-    )
-    autoencoder_train_state = TrainState.create(
-        apply_fn=autoencoder_model.apply,
-        params=params,
-        tx=optimizer,
-    )
-    latent_representations = autoencoder_model.apply(
-        autoencoder_train_state.params,
-        x,
-        method=autoencoder_model.encoder,
-    )
-    print(latent_representations.shape)
-    assert latent_representations.shape == (5, 170)
+    assert x_latent.shape == (5, 170)

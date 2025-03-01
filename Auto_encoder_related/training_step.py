@@ -7,15 +7,18 @@ import flax.linen as nn
 
 # Loss function (e.g., Mean Squared Error for reconstruction)
 def loss_fn(model, params, x):
-    x_recon = model.apply(params, x)
+    x_latent, x_recon = model.apply(params, x)
     return jnp.mean((x - x_recon) ** 2)
 
 
 # Use minibatch 1 -> maybe change to multiple minibatches
-@jax.jit
-def train_step(train_state, batch):
+@partial(jax.jit, static_argnums=(0,))
+def train_step(model, train_state, batch):
     def compute_loss(params):
-        return loss_fn(params, batch)
+        return loss_fn(model, params, batch)
+
+    # Combine the agent dimension of the batch
+    batch = jnp.reshape(batch, (-1,) + batch.shape[2:])
 
     # Compute loss and gradients
     loss = compute_loss(train_state.params)
