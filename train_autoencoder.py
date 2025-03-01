@@ -27,6 +27,9 @@ from jax_tqdm import scan_tqdm
 from flax.training.train_state import TrainState
 import time
 from Auto_encoder_related.training_step import train_step, loss_fn
+from Auto_encoder_related.plot_evaluate_autoencoder import (
+    plot_store_results_autoencoder,
+)
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -226,10 +229,14 @@ def main(args):
     autoencoder_train_state, metrics = jax.lax.scan(
         _update_step, runner_state, jnp.arange(args.num_epochs)
     )
+    out = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (-1,)), metrics)
 
     print("Start evaluation of trained autoencoder ...")
     # Evaluate results using testing set - plot loss and store final loss and args in json file.
     # Store autoencoder weights in a file
+    plot_store_results_autoencoder(
+        log_directory, start_training_time, autoencoder_train_state.params, out, args
+    )
 
 
 if __name__ == "__main__":
