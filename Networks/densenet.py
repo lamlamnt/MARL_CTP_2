@@ -83,13 +83,6 @@ class DenseNet(nn.Module):
     @nn.compact
     def __call__(self, x: jnp.ndarray):
         x = jnp.transpose(x, (1, 2, 0))
-        # This initial convolutional layer is added in later
-        x = nn.Conv(
-            6,
-            kernel_size=(1, 1),
-            kernel_init=self.densenet_kernel_init,
-            bias_init=constant(0.0),
-        )(x)
         c_hidden = (
             self.growth_rate * self.bn_size
         )  # The start number of hidden channels
