@@ -204,7 +204,7 @@ def main(args):
             env_key,
             timestep_in_episode,
         ) = runner_state
-        # Update encoder
+        # Update encoder - num times to update
         autoencoder_train_state, training_loss = train_step(
             autoencoder_model, autoencoder_train_state, traj_batch
         )
@@ -218,7 +218,7 @@ def main(args):
             timestep_in_episode,
         )
 
-        # Perform inference on validation set to plot learning curve
+        # Perform inference on validation set to plot learning curve. Maybe not at every epoch?
         validation_loss = loss_fn(
             autoencoder_model, autoencoder_train_state.params, validation_set
         )
@@ -226,10 +226,11 @@ def main(args):
         return runner_state, metrics
 
     start_training_time = time.time()
-    autoencoder_train_state, metrics = jax.lax.scan(
+    runner_state, metrics = jax.lax.scan(
         _update_step, runner_state, jnp.arange(args.num_epochs)
     )
     out = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (-1,)), metrics)
+    autoencoder_train_state = runner_state[1]
 
     print("Start evaluation of trained autoencoder ...")
     # Evaluate results using testing set - plot loss and store final loss and args in json file.
@@ -358,7 +359,7 @@ if __name__ == "__main__":
         type=int,
         help="Number of environment steps to collect before updating the encoder",
         required=False,
-        default=2000,
+        default=1000,
     )
     parser.add_argument("--weight_decay", type=float, required=False, default=0.0001)
     parser.add_argument(

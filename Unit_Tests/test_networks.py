@@ -14,7 +14,7 @@ from Networks.densenet import (
 
 
 def test_densenet(printer):
-    model = DenseNet_ActorCritic(10)
+    model = DenseNet_ActorCritic_Same(10)
     key = jax.random.PRNGKey(100)
     params = model.init(key, jnp.ones((6, 12, 10)))
     action_values, critic = model.apply(params, jnp.ones((6, 12, 10)))

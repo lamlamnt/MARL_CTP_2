@@ -9,8 +9,10 @@ from Networks.densenet import (
     DenseNet_ActorCritic_Same_2_Critic_Values,
     DenseNet_ActorCritic_2_Critic_Values,
 )
+from Networks.densenet_after_autoencoder import Densenet_1D
 from Agents.ppo import PPO
 from Agents.ppo_combine_individual_team import PPO_2_Critic_Values
+from Agents.ppo_autoencoder import PPO_Autoencoder
 import argparse
 import optax
 from flax.training.train_state import TrainState
@@ -39,6 +41,8 @@ from Utils.hand_crafted_graphs import (
     get_sacrifice_in_choosing_goals_graph,
     get_dynamic_choose_goal_graph,
 )
+from Networks.autoencoder import Autoencoder, OneLayerNet
+import re
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -198,6 +202,56 @@ def main(args):
     init_key, env_action_key = jax.vmap(jax.random.PRNGKey)(
         jnp.arange(2) + args.random_seed_for_training
     )
+    # Load autoencoder weights if using autoencoder
+    if args.autoencoder_weights is not None:
+        if args.num_critic_values != 2:
+            raise ValueError("Autoencoder for 2 critic values not implemented yet")
+        if args.network_type != "Densenet_Autoencoder":
+            raise ValueError("Autoencoder must be used with Densenet_Autoencoder")
+        autoencoder_weights_path = os.path.join(
+            current_directory, "Logs", args.autoencoder_weights, "weights.flax"
+        )
+        with open(autoencoder_weights_path, "rb") as f:
+            autoencoder_params = flax.serialization.from_bytes(f.read())
+        # Load autoencoder's properties from file
+        with open("Hyperparameters_Results.json", "r") as f:
+            content = f.read()  # Read the full file as text
+            # Extract everything between the first { and }
+        match = re.search(r"\{.*?\}", content, re.DOTALL)
+        first_json_str = match.group(0)  # Extract the JSON substring
+        first_json_dict = json.loads(first_json_str)  # Convert to dictionary
+        autoencoder_model = Autoencoder(
+            hidden_size=first_json_dict["hidden_size"],
+            latent_size=first_json_dict["latent_size"],
+            output_size=state_shape,
+        )
+        agent = PPO_Autoencoder(
+            model,
+            environment,
+            args.discount_factor,
+            args.gae_lambda,
+            args.clip_eps,
+            args.vf_coeff,
+            args.ent_coeff,
+            batch_size=args.num_steps_before_update,
+            num_minibatches=args.num_minibatches,
+            horizon_length=args.horizon_length_factor * n_node,
+            reward_exceed_horizon=args.reward_exceed_horizon,
+            num_loops=num_loops,
+            anneal_ent_coeff=args.anneal_ent_coeff,
+            deterministic_inference_policy=args.deterministic_inference_policy,
+            ent_coeff_schedule=args.ent_coeff_schedule,
+            sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
+            // args.num_steps_before_update,
+            sigmoid_total_nums_all=args.sigmoid_total_nums_all
+            // args.num_steps_before_update,
+            num_agents=args.n_agent,
+            reward_service_goal=args.reward_service_goal,
+            individual_reward_weight=args.individual_reward_weight,
+            individual_reward_weight_schedule=args.anneal_individual_reward_weight,
+            autoencoder=autoencoder_model,
+            autoencoder_params=autoencoder_params,
+        )
     if args.num_critic_values == 1:
         agent = PPO(
             model,
@@ -263,6 +317,7 @@ def main(args):
             "reward_service_goal": args.reward_service_goal,
         }
     )
+
     print("Start training ...")
 
     @scan_tqdm(num_loops)
@@ -285,10 +340,15 @@ def main(args):
         augmented_state = get_augmented_optimistic_pessimistic_belief(
             current_belief_states
         )
+
+        # Use jax.lax.cond and a dummy autoencoder model that produces the same output shape
+        # augmented_state = autoencoder_model.apply(autoencoder_params, augmented_state)
+
         # vmap over the agents
         _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
             train_state.params, augmented_state
         )
+
         advantages, targets = agent.calculate_gae(
             traj_batch, last_critic_val, loop_count
         )
@@ -456,7 +516,7 @@ if __name__ == "__main__":
         "--network_type",
         type=str,
         required=False,
-        help="Options: Densenet,Densenet_Same",
+        help="Options: Densenet,Densenet_Same, Densenet_Autoencoder",
         default="Densenet_Same",
     )
     parser.add_argument("--densenet_bn_size", type=int, required=False, default=4)
@@ -669,6 +729,15 @@ if __name__ == "__main__":
         default="linear",
         required=False,
         help="Options: constant, linear. The arg individual_reward_weight is the starting weight. Constant or linear annealing to 0.0 over time during training",
+    )
+
+    # Hyperparameters specific to autoencoder
+    parser.add_argument(
+        "--autoencoder_weights",
+        type=str,
+        required=False,
+        default=None,
+        help="Path to trained autoencoder weights",
     )
 
     args = parser.parse_args()

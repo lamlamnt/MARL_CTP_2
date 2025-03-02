@@ -44,6 +44,10 @@ def plot_store_results_autoencoder(log_directory, start_time, model_params, out,
         fh.write("\n")
         json.dump({"Total training time in seconds": elapsed_time}, fh)
         fh.write("\n")
+        json.dump({"Final training loss": out["training_loss"][-1]}, fh)
+        fh.write("\n")
+        json.dump({"Final validation loss": out["validation_loss"][-1]}, fh)
+        fh.write("\n")
         fh.write("\nNetwork architecture: \n")
         for layer_name, weights in extract_params(model_params):
             fh.write(f"{layer_name}: {weights.shape}\n")
