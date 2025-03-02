@@ -143,7 +143,7 @@ def main(args):
             num_stored_graphs=num_inference_graphs,
             loaded_graphs=inference_graphs,
         )
-    if args.autoencoder_weights is not None:
+    if args.autoencoder_weights:
         model = Densenet_1D(
             n_node,
             act_fn=nn.leaky_relu,
@@ -212,7 +212,7 @@ def main(args):
         jnp.arange(2) + args.random_seed_for_training
     )
     # Load autoencoder weights if using autoencoder
-    if args.autoencoder_weights is not None:
+    if args.autoencoder_weights:
         if args.num_critic_values != 2:
             raise ValueError("Autoencoder for 2 critic values not implemented yet")
         if args.network_type != "Densenet_Autoencoder":
@@ -423,9 +423,9 @@ def main(args):
             current_belief_states
         )
 
-        action_mask = decide_validity_of_action_space(augmented_state)
+        action_mask = jax.vmap(decide_validity_of_action_space)(augmented_state)
         augmented_state = autoencoder_model.apply(autoencoder_params, augmented_state)
-        _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
+        _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0, 0))(
             train_state.params, augmented_state, action_mask
         )
 
@@ -490,7 +490,7 @@ def main(args):
         loop_count,
         jnp.bool_(True),
     )
-    if args.autoencoder_weights is not None:
+    if not args.autoencoder_weights:
         runner_state, metrics = jax.lax.scan(
             _update_step, runner_state, jnp.arange(num_loops)
         )
