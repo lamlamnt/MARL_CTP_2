@@ -3,6 +3,10 @@ import jax
 import jax.numpy as jnp
 import flax
 import flax.linen as nn
+import sys
+
+sys.path.append("..")
+from Utils.invalid_action_masking import decide_validity_of_action_space
 
 
 # Loss function (e.g., Mean Squared Error for reconstruction)
@@ -30,3 +34,28 @@ def train_step(model, train_state, batch):
 
     # Return the updated train state and the loss
     return train_state, loss
+
+
+# for the training loop in the main.py file
+def get_last_critic_val_autoencoder_version(
+    autoencoder_model,
+    autoencoder_params,
+    augmented_state,
+    densenet_model,
+    densenet_train_state,
+):
+    augmented_state = autoencoder_model.apply(autoencoder_params, augmented_state)
+    action_mask = decide_validity_of_action_space(augmented_state)
+    _, last_critic_val = jax.vmap(densenet_model.apply, in_axes=(None, 0))(
+        densenet_train_state.params, augmented_state, action_mask
+    )
+    return last_critic_val
+
+
+def get_last_critic_val_normal_version(
+    densenet_model, densenet_train_state, augmented_state
+):
+    _, last_critic_val = jax.vmap(densenet_model.apply, in_axes=(None, 0))(
+        densenet_train_state.params, augmented_state
+    )
+    return last_critic_val

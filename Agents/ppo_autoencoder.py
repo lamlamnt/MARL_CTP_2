@@ -12,6 +12,7 @@ from Environment.CTP_environment import MA_CTP_General
 from Environment import CTP_generator
 from Utils.augmented_belief_state import get_augmented_optimistic_pessimistic_belief
 from Utils.optimal_combination import get_optimal_combination_and_cost
+from Utils.invalid_action_masking import decide_validity_of_action_space
 
 
 class Transition(NamedTuple):
@@ -119,7 +120,8 @@ class PPO_Autoencoder:
         )
 
         def _choose_action(belief_state):
-            pi, _ = self.model.apply(params, belief_state)
+            action_mask = decide_validity_of_action_space(belief_state)
+            pi, _ = self.model.apply(params, belief_state, action_mask)
             random_action = pi.sample(
                 seed=key
             )  # use the same key for all agents (maybe not good)
@@ -161,7 +163,10 @@ class PPO_Autoencoder:
         )
 
         def _choose_action(belief_state):
-            pi, critic_value = self.model.apply(train_state.params, belief_state)
+            action_mask = decide_validity_of_action_space(belief_state)
+            pi, critic_value = self.model.apply(
+                train_state.params, belief_state, action_mask
+            )
             action = pi.sample(
                 seed=action_key
             )  # use the same key for all agents (maybe not good)
@@ -321,9 +326,12 @@ class PPO_Autoencoder:
         )
 
         # vmap over agents and over timesteps
+        traj_batch_action_mask = jax.vmap(jax.vmap(decide_validity_of_action_space))(
+            traj_batch_augmented_belief_state
+        )
         pi, value = jax.vmap(
-            jax.vmap(self.model.apply, in_axes=(None, 0)), in_axes=(None, 0)
-        )(params, traj_batch_augmented_belief_state)
+            jax.vmap(self.model.apply, in_axes=(None, 0, 0)), in_axes=(None, 0, 0)
+        )(params, traj_batch_augmented_belief_state, traj_batch_action_mask)
         # value has shape (num_steps_before_update, num_agents)
         log_prob = pi.log_prob(traj_batch.action)
 

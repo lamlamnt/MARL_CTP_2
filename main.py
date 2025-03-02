@@ -43,6 +43,10 @@ from Utils.hand_crafted_graphs import (
 )
 from Networks.autoencoder import Autoencoder, OneLayerNet
 import re
+from Auto_encoder_related.training_step import (
+    get_last_critic_val_autoencoder_version,
+    get_last_critic_val_normal_version,
+)
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -142,8 +146,16 @@ def main(args):
             num_stored_graphs=num_inference_graphs,
             loaded_graphs=inference_graphs,
         )
-
-    if args.network_type == "Densenet" and args.num_critic_values == 1:
+    if args.autoencoder_weights is not None:
+        model = Densenet_1D(
+            n_node,
+            act_fn=nn.leaky_relu,
+            densenet_kernel_init=nn.initializers.kaiming_normal(),
+            bn_size=args.densenet_bn_size,
+            growth_rate=args.densenet_growth_rate,
+            num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
+        )
+    elif args.network_type == "Densenet" and args.num_critic_values == 1:
         model = DenseNet_ActorCritic(
             n_node,
             act_fn=nn.leaky_relu,
@@ -252,6 +264,13 @@ def main(args):
             autoencoder=autoencoder_model,
             autoencoder_params=autoencoder_params,
         )
+        use_autoencoder = jnp.bool_(True)
+    else:
+        use_autoencoder = jnp.bool_(False)
+        auto_encoder_model = OneLayerNet()
+        auto_encoder_params = auto_encoder_model.init(
+            jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
+        )
     if args.num_critic_values == 1:
         agent = PPO(
             model,
@@ -342,12 +361,25 @@ def main(args):
         )
 
         # Use jax.lax.cond and a dummy autoencoder model that produces the same output shape
-        # augmented_state = autoencoder_model.apply(autoencoder_params, augmented_state)
+        last_critic_val = jax.lax.cond(
+            use_autoencoder,
+            lambda _: get_last_critic_val_autoencoder_version(
+                autoencoder_model,
+                autoencoder_params,
+                augmented_state,
+                model,
+                train_state,
+            ),
+            lambda _: get_last_critic_val_normal_version(
+                model, train_state, augmented_state
+            ),
+            operand=None,
+        )
 
         # vmap over the agents
-        _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
-            train_state.params, augmented_state
-        )
+        # _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
+        #    train_state.params, augmented_state
+        # )
 
         advantages, targets = agent.calculate_gae(
             traj_batch, last_critic_val, loop_count
