@@ -41,12 +41,9 @@ from Utils.hand_crafted_graphs import (
     get_sacrifice_in_choosing_goals_graph,
     get_dynamic_choose_goal_graph,
 )
-from Networks.autoencoder import Autoencoder, OneLayerNet
+from Networks.autoencoder import Autoencoder
 import re
-from Auto_encoder_related.training_step import (
-    get_last_critic_val_autoencoder_version,
-    get_last_critic_val_normal_version,
-)
+from Utils.invalid_action_masking import decide_validity_of_action_space
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -264,13 +261,6 @@ def main(args):
             autoencoder=autoencoder_model,
             autoencoder_params=autoencoder_params,
         )
-        use_autoencoder = jnp.bool_(True)
-    else:
-        use_autoencoder = jnp.bool_(False)
-        auto_encoder_model = OneLayerNet()
-        auto_encoder_params = auto_encoder_model.init(
-            jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
-        )
     if args.num_critic_values == 1:
         agent = PPO(
             model,
@@ -360,26 +350,84 @@ def main(args):
             current_belief_states
         )
 
-        # Use jax.lax.cond and a dummy autoencoder model that produces the same output shape
-        last_critic_val = jax.lax.cond(
-            use_autoencoder,
-            lambda _: get_last_critic_val_autoencoder_version(
-                autoencoder_model,
-                autoencoder_params,
-                augmented_state,
-                model,
-                train_state,
-            ),
-            lambda _: get_last_critic_val_normal_version(
-                model, train_state, augmented_state
-            ),
-            operand=None,
+        _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
+            train_state.params, augmented_state
         )
 
-        # vmap over the agents
-        # _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
-        #    train_state.params, augmented_state
-        # )
+        advantages, targets = agent.calculate_gae(
+            traj_batch, last_critic_val, loop_count
+        )
+        # advantages and targets are of shape (num_steps_before_update,num_agents)
+
+        # Update the network
+        update_state = (train_state, traj_batch, advantages, targets, key, loop_count)
+        update_state, total_loss = jax.lax.scan(
+            agent._update_epoch, update_state, None, args.num_update_epochs
+        )
+        train_state = update_state[0]
+        rng = update_state[-2]
+
+        loop_count += 1
+
+        runner_state = (
+            train_state,
+            new_env_state,
+            current_belief_states,
+            rng,
+            timestep_in_episode,
+            loop_count,
+            previous_episode_done,
+        )
+
+        # Perform inference (using testing environment) (if loop_count divisible by 50 for example - tunable)
+        # Get average and store in metrics, just like loss
+        testing_average_competitive_ratio = jax.lax.cond(
+            loop_count % args.frequency_testing == 0,
+            lambda _: get_average_testing_stats(
+                testing_environment, agent, train_state.params, arguments
+            ),
+            lambda _: jnp.float16(0.0),
+            None,
+        )
+
+        # Collect metrics
+        metrics = {
+            "losses": total_loss,
+            "all_total_rewards": jnp.sum(
+                traj_batch.reward, axis=1
+            ),  # doing this results in all_rewards with shape (num_timesteps,)
+            "all_episode_done": jnp.all(traj_batch.done, axis=1),
+            "all_optimal_costs": traj_batch.shortest_path,
+            "testing_average_competitive_ratio": testing_average_competitive_ratio,
+        }
+        return runner_state, metrics
+
+    @scan_tqdm(num_loops)
+    def _update_step_autoencoder(runner_state, unused):
+        # Collect trajectories
+        runner_state, traj_batch = jax.lax.scan(
+            agent.env_step, runner_state, None, args.num_steps_before_update
+        )
+        # Calculate advantages
+        # timestep_in_episode is unused here
+        (
+            train_state,
+            new_env_state,
+            current_belief_states,
+            key,
+            timestep_in_episode,
+            loop_count,
+            previous_episode_done,
+        ) = runner_state
+        augmented_state = get_augmented_optimistic_pessimistic_belief(
+            current_belief_states
+        )
+
+        action_mask = decide_validity_of_action_space(augmented_state)
+        augmented_state = autoencoder_model.apply(autoencoder_params, augmented_state)
+        _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0))(
+            train_state.params, augmented_state, action_mask
+        )
 
         advantages, targets = agent.calculate_gae(
             traj_batch, last_critic_val, loop_count
@@ -442,9 +490,14 @@ def main(args):
         loop_count,
         jnp.bool_(True),
     )
-    runner_state, metrics = jax.lax.scan(
-        _update_step, runner_state, jnp.arange(num_loops)
-    )
+    if args.autoencoder_weights is not None:
+        runner_state, metrics = jax.lax.scan(
+            _update_step, runner_state, jnp.arange(num_loops)
+        )
+    else:
+        runner_state, metrics = jax.lax.scan(
+            _update_step_autoencoder, runner_state, jnp.arange(num_loops)
+        )
     train_state = runner_state[0]
     # Metrics will be stacked. Get episode done from all_done and total rewards from all_rewards
     out = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (-1,)), metrics)

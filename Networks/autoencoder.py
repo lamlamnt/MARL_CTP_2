@@ -159,9 +159,3 @@ class Autoencoder(nn.Module):
             latent_representation
         )  # Decode latent representation back to data space
         return latent_representation, reconstructed
-
-
-class OneLayerNet(nn.Module):
-    @nn.compact
-    def __call__(self, x):
-        return x
