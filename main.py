@@ -189,28 +189,6 @@ def main(args):
             num_layers=tuple(map(int, (args.densenet_num_layers).split(","))),
         )
 
-    init_params = model.init(
-        jax.random.PRNGKey(0), jax.random.normal(online_key, state_shape)
-    )
-    # Load in pre-trained network weights
-    if args.load_network_directory is not None:
-        network_file_path = os.path.join(
-            current_directory, "Logs", args.load_network_directory, "weights.flax"
-        )
-        with open(network_file_path, "rb") as f:
-            init_params = flax.serialization.from_bytes(init_params, f.read())
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(args.optimizer_norm_clip),
-        optax.adam(learning_rate=args.learning_rate, eps=1e-5),
-    )
-    train_state = TrainState.create(
-        apply_fn=model.apply,
-        params=init_params,
-        tx=optimizer,
-    )
-    init_key, env_action_key = jax.vmap(jax.random.PRNGKey)(
-        jnp.arange(2) + args.random_seed_for_training
-    )
     # Load autoencoder weights if using autoencoder
     if args.autoencoder_weights:
         if args.num_critic_values != 2:
@@ -261,6 +239,36 @@ def main(args):
             autoencoder=autoencoder_model,
             autoencoder_params=autoencoder_params,
         )
+        init_params = model.init(
+            jax.random.PRNGKey(0),
+            jax.random.normal(online_key, state_shape),
+            jnp.ones(n_node + 1),
+        )
+    else:
+        init_params = model.init(
+            jax.random.PRNGKey(0),
+            jax.random.normal(online_key, state_shape),
+        )
+    # Load in pre-trained network weights
+    if args.load_network_directory is not None:
+        network_file_path = os.path.join(
+            current_directory, "Logs", args.load_network_directory, "weights.flax"
+        )
+        with open(network_file_path, "rb") as f:
+            init_params = flax.serialization.from_bytes(init_params, f.read())
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(args.optimizer_norm_clip),
+        optax.adam(learning_rate=args.learning_rate, eps=1e-5),
+    )
+    train_state = TrainState.create(
+        apply_fn=model.apply,
+        params=init_params,
+        tx=optimizer,
+    )
+    init_key, env_action_key = jax.vmap(jax.random.PRNGKey)(
+        jnp.arange(2) + args.random_seed_for_training
+    )
+
     if args.num_critic_values == 1:
         agent = PPO(
             model,
@@ -491,10 +499,14 @@ def main(args):
         jnp.bool_(True),
     )
     if not args.autoencoder_weights:
+        print(
+            "Using normal adjacency matrix representation as input to the actor and critic networks"
+        )
         runner_state, metrics = jax.lax.scan(
             _update_step, runner_state, jnp.arange(num_loops)
         )
     else:
+        print("Using encoder before actor and critic networks")
         runner_state, metrics = jax.lax.scan(
             _update_step_autoencoder, runner_state, jnp.arange(num_loops)
         )
