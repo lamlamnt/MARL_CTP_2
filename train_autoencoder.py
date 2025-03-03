@@ -36,7 +36,9 @@ NUM_CHANNELS_IN_BELIEF_STATE = 6
 
 def main(args):
     current_directory = os.getcwd()
-    log_directory = os.path.join(current_directory, "Logs", args.log_directory)
+    log_directory = os.path.join(
+        current_directory, "Trained_encoder_logs", args.log_directory
+    )
     if not os.path.exists(log_directory):
         os.makedirs(log_directory)
 
@@ -443,7 +445,10 @@ if __name__ == "__main__":
                     setattr(args, key, config[key])
                 # Instead of using run.id, can concatenate parameters
                 log_directory = os.path.join(
-                    os.getcwd(), "Logs", args.wandb_project_name, run.name
+                    os.getcwd(),
+                    "Trained_encoder_logs",
+                    args.wandb_project_name,
+                    run.name,
                 )
                 args.log_directory = log_directory
                 main(args)

@@ -191,17 +191,23 @@ def main(args):
 
     # Load autoencoder weights if using autoencoder
     if args.autoencoder_weights:
-        if args.num_critic_values != 2:
+        if args.num_critic_values > 1:
             raise ValueError("Autoencoder for 2 critic values not implemented yet")
         if args.network_type != "Densenet_Autoencoder":
             raise ValueError("Autoencoder must be used with Densenet_Autoencoder")
         autoencoder_weights_path = os.path.join(
             current_directory, "Logs", args.autoencoder_weights, "weights.flax"
         )
-        with open(autoencoder_weights_path, "rb") as f:
-            autoencoder_params = flax.serialization.from_bytes(f.read())
         # Load autoencoder's properties from file
-        with open("Hyperparameters_Results.json", "r") as f:
+        with open(
+            os.path.join(
+                os.getcwd(),
+                "Trained_encoder_logs",
+                autoencoder_weights_path,
+                "Hyperparameters_Results.json",
+            ),
+            "r",
+        ) as f:
             content = f.read()  # Read the full file as text
             # Extract everything between the first { and }
         match = re.search(r"\{.*?\}", content, re.DOTALL)
@@ -212,6 +218,15 @@ def main(args):
             latent_size=first_json_dict["latent_size"],
             output_size=state_shape,
         )
+        with open(autoencoder_weights_path, "rb") as f:
+            autoencoder_params = autoencoder_model.init(
+                jax.random.PRNGKey(0),
+                jax.random.normal(online_key, state_shape),
+                jnp.ones(n_node + 1),
+            )
+            autoencoder_params = flax.serialization.from_bytes(
+                autoencoder_params, f.read()
+            )
         agent = PPO_Autoencoder(
             model,
             environment,
