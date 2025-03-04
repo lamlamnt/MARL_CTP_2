@@ -120,7 +120,7 @@ class PPO_Autoencoder:
         )
 
         def _choose_action(latent_belief_state, augmented_belief_state):
-            action_mask = decide_validity_of_action_space(augmented_belief_states)
+            action_mask = decide_validity_of_action_space(augmented_belief_state)
             pi, _ = self.model.apply(params, latent_belief_state, action_mask)
             random_action = pi.sample(
                 seed=key
@@ -173,7 +173,7 @@ class PPO_Autoencoder:
             log_prob = pi.log_prob(action)
             return action, critic_value, log_prob
 
-        actions, critic_values, log_probs = jax.vmap(_choose_action, in_axes=0)(
+        actions, critic_values, log_probs = jax.vmap(_choose_action, in_axes=(0, 0))(
             latent_belief_states, augmented_belief_states
         )
         new_env_state, new_belief_states, rewards, dones, env_key = (

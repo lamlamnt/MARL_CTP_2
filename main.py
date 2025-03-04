@@ -210,9 +210,10 @@ def main(args):
         match = re.search(r"\{.*?\}", content, re.DOTALL)
         first_json_str = match.group(0)  # Extract the JSON substring
         first_json_dict = json.loads(first_json_str)  # Convert to dictionary
+        latent_size = first_json_dict["latent_size"]
         autoencoder_model = Autoencoder(
             hidden_size=first_json_dict["hidden_size"],
-            latent_size=first_json_dict["latent_size"],
+            latent_size=latent_size,
             output_size=state_shape,
         )
         autoencoder_weights_path = os.path.join(
@@ -230,7 +231,7 @@ def main(args):
             )
         init_params = model.init(
             jax.random.PRNGKey(0),
-            jax.random.normal(online_key, (args.latent_size,)),
+            jax.random.normal(online_key, (latent_size,)),
             jnp.ones(n_node + 1),
         )
     else:
