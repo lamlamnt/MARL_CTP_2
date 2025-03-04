@@ -153,10 +153,10 @@ def main(args):
     )
 
     # Initialize autoencoder
-    latent_size = 18 * args.n_node - 30 + args.n_node * args.n_agent
+    # latent_size = 18 * args.n_node - 30 + args.n_node * args.n_agent
     autoencoder_model = Autoencoder(
         hidden_size=args.hidden_size,
-        latent_size=latent_size,
+        latent_size=args.latent_size,
         output_size=state_shape,
     )
     autoencoder_init_params = autoencoder_model.init(
@@ -371,6 +371,7 @@ if __name__ == "__main__":
         default=48,
         help="Number of channels of the first convolutional layer in the encoder",
     )
+    parser.add_argument("--latent_size", type=int, required=False, default=170)
 
     # Args related to evaluation
     parser.add_argument(

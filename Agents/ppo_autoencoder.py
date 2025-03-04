@@ -115,21 +115,21 @@ class PPO_Autoencoder:
         augmented_belief_states = get_augmented_optimistic_pessimistic_belief(
             belief_states
         )
-        augmented_belief_states = self.autoencoder_model.apply(
+        latent_belief_state, _ = self.autoencoder_model.apply(
             self.autoencoder_params, augmented_belief_states
         )
 
-        def _choose_action(belief_state):
-            action_mask = decide_validity_of_action_space(belief_state)
-            pi, _ = self.model.apply(params, belief_state, action_mask)
+        def _choose_action(latent_belief_state, augmented_belief_state):
+            action_mask = decide_validity_of_action_space(augmented_belief_states)
+            pi, _ = self.model.apply(params, latent_belief_state, action_mask)
             random_action = pi.sample(
                 seed=key
             )  # use the same key for all agents (maybe not good)
             mode_action = pi.mode()
             return random_action, mode_action
 
-        random_actions, mode_actions = jax.vmap(_choose_action, in_axes=0)(
-            augmented_belief_states
+        random_actions, mode_actions = jax.vmap(_choose_action, in_axes=(0, 0))(
+            latent_belief_state, augmented_belief_states
         )
         actions = jax.lax.cond(
             self.deterministic_inference_policy,
@@ -158,14 +158,14 @@ class PPO_Autoencoder:
         augmented_belief_states = get_augmented_optimistic_pessimistic_belief(
             current_belief_states
         )
-        augmented_belief_states = self.autoencoder_model.apply(
+        latent_belief_states, _ = self.autoencoder_model.apply(
             self.autoencoder_params, augmented_belief_states
         )
 
-        def _choose_action(belief_state):
-            action_mask = decide_validity_of_action_space(belief_state)
+        def _choose_action(latent_belief_state, augmented_belief_state):
+            action_mask = decide_validity_of_action_space(augmented_belief_state)
             pi, critic_value = self.model.apply(
-                train_state.params, belief_state, action_mask
+                train_state.params, latent_belief_state, action_mask
             )
             action = pi.sample(
                 seed=action_key
@@ -174,7 +174,7 @@ class PPO_Autoencoder:
             return action, critic_value, log_prob
 
         actions, critic_values, log_probs = jax.vmap(_choose_action, in_axes=0)(
-            augmented_belief_states
+            latent_belief_states, augmented_belief_states
         )
         new_env_state, new_belief_states, rewards, dones, env_key = (
             self.environment.step(
@@ -314,6 +314,9 @@ class PPO_Autoencoder:
         traj_batch_augmented_belief_state = jax.vmap(
             get_augmented_optimistic_pessimistic_belief
         )(traj_batch.belief_state)
+        traj_batch_action_mask = jax.vmap(jax.vmap(decide_validity_of_action_space))(
+            traj_batch_augmented_belief_state
+        )
 
         traj_batch_augmented_belief_states_swapped = jnp.swapaxes(
             traj_batch_augmented_belief_state, 0, 1
@@ -326,9 +329,6 @@ class PPO_Autoencoder:
         )
 
         # vmap over agents and over timesteps
-        traj_batch_action_mask = jax.vmap(jax.vmap(decide_validity_of_action_space))(
-            traj_batch_augmented_belief_state
-        )
         pi, value = jax.vmap(
             jax.vmap(self.model.apply, in_axes=(None, 0, 0)), in_axes=(None, 0, 0)
         )(params, traj_batch_augmented_belief_state, traj_batch_action_mask)

@@ -195,15 +195,12 @@ def main(args):
             raise ValueError("Autoencoder for 2 critic values not implemented yet")
         if args.network_type != "Densenet_Autoencoder":
             raise ValueError("Autoencoder must be used with Densenet_Autoencoder")
-        autoencoder_weights_path = os.path.join(
-            current_directory, "Logs", args.autoencoder_weights, "weights.flax"
-        )
         # Load autoencoder's properties from file
         with open(
             os.path.join(
                 os.getcwd(),
                 "Trained_encoder_logs",
-                autoencoder_weights_path,
+                args.autoencoder_weights,
                 "Hyperparameters_Results.json",
             ),
             "r",
@@ -218,45 +215,22 @@ def main(args):
             latent_size=first_json_dict["latent_size"],
             output_size=state_shape,
         )
+        autoencoder_weights_path = os.path.join(
+            current_directory,
+            "Trained_encoder_logs",
+            args.autoencoder_weights,
+            "weights.flax",
+        )
         with open(autoencoder_weights_path, "rb") as f:
             autoencoder_params = autoencoder_model.init(
-                jax.random.PRNGKey(0),
-                jax.random.normal(online_key, state_shape),
-                jnp.ones(n_node + 1),
+                jax.random.PRNGKey(0), jax.random.normal(online_key, (1,) + state_shape)
             )
             autoencoder_params = flax.serialization.from_bytes(
                 autoencoder_params, f.read()
             )
-        agent = PPO_Autoencoder(
-            model,
-            environment,
-            args.discount_factor,
-            args.gae_lambda,
-            args.clip_eps,
-            args.vf_coeff,
-            args.ent_coeff,
-            batch_size=args.num_steps_before_update,
-            num_minibatches=args.num_minibatches,
-            horizon_length=args.horizon_length_factor * n_node,
-            reward_exceed_horizon=args.reward_exceed_horizon,
-            num_loops=num_loops,
-            anneal_ent_coeff=args.anneal_ent_coeff,
-            deterministic_inference_policy=args.deterministic_inference_policy,
-            ent_coeff_schedule=args.ent_coeff_schedule,
-            sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
-            // args.num_steps_before_update,
-            sigmoid_total_nums_all=args.sigmoid_total_nums_all
-            // args.num_steps_before_update,
-            num_agents=args.n_agent,
-            reward_service_goal=args.reward_service_goal,
-            individual_reward_weight=args.individual_reward_weight,
-            individual_reward_weight_schedule=args.anneal_individual_reward_weight,
-            autoencoder=autoencoder_model,
-            autoencoder_params=autoencoder_params,
-        )
         init_params = model.init(
             jax.random.PRNGKey(0),
-            jax.random.normal(online_key, state_shape),
+            jax.random.normal(online_key, (args.latent_size,)),
             jnp.ones(n_node + 1),
         )
     else:
@@ -284,7 +258,35 @@ def main(args):
         jnp.arange(2) + args.random_seed_for_training
     )
 
-    if args.num_critic_values == 1:
+    if args.autoencoder_weights:
+        agent = PPO_Autoencoder(
+            model,
+            environment,
+            args.discount_factor,
+            args.gae_lambda,
+            args.clip_eps,
+            args.vf_coeff,
+            args.ent_coeff,
+            batch_size=args.num_steps_before_update,
+            num_minibatches=args.num_minibatches,
+            horizon_length=args.horizon_length_factor * n_node,
+            reward_exceed_horizon=args.reward_exceed_horizon,
+            num_loops=num_loops,
+            anneal_ent_coeff=args.anneal_ent_coeff,
+            deterministic_inference_policy=args.deterministic_inference_policy,
+            ent_coeff_schedule=args.ent_coeff_schedule,
+            sigmoid_beginning_offset_num=args.sigmoid_beginning_offset_num
+            // args.num_steps_before_update,
+            sigmoid_total_nums_all=args.sigmoid_total_nums_all
+            // args.num_steps_before_update,
+            num_agents=args.n_agent,
+            reward_service_goal=args.reward_service_goal,
+            individual_reward_weight=args.individual_reward_weight,
+            individual_reward_weight_schedule=args.anneal_individual_reward_weight,
+            autoencoder_model=autoencoder_model,
+            autoencoder_params=autoencoder_params,
+        )
+    elif args.num_critic_values == 1:
         agent = PPO(
             model,
             environment,
@@ -447,9 +449,9 @@ def main(args):
         )
 
         action_mask = jax.vmap(decide_validity_of_action_space)(augmented_state)
-        augmented_state = autoencoder_model.apply(autoencoder_params, augmented_state)
+        latent_state, _ = autoencoder_model.apply(autoencoder_params, augmented_state)
         _, last_critic_val = jax.vmap(model.apply, in_axes=(None, 0, 0))(
-            train_state.params, augmented_state, action_mask
+            train_state.params, latent_state, action_mask
         )
 
         advantages, targets = agent.calculate_gae(
