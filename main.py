@@ -125,10 +125,12 @@ def main(args):
 
     # Create the testing environment
     if args.num_stored_graphs == 1:
-        print("Test environment is the same as training environment")
+        print(
+            "Test environment is the same as training environment. Including graph and reward for failing to service a goal due to smaller index agent"
+        )
         testing_environment = environment
     else:
-        print("Test environment is different from training environment")
+        print("Test graphs are different from training graphs")
         inference_key = jax.random.PRNGKey(args.random_seed_for_inference)
         testing_environment = MA_CTP_General(
             args.n_agent,
@@ -139,7 +141,7 @@ def main(args):
             grid_size=n_node,
             reward_for_invalid_action=args.reward_for_invalid_action,
             reward_service_goal=args.reward_service_goal,
-            reward_fail_to_service_goal_larger_index=args.reward_fail_to_service_goal_larger_index,
+            reward_fail_to_service_goal_larger_index=args.reward_service_goal,
             num_stored_graphs=num_inference_graphs,
             loaded_graphs=inference_graphs,
         )
@@ -589,7 +591,7 @@ if __name__ == "__main__":
         type=float,
         help="Should be equal to or more negative than -1",
         required=False,
-        default=-1.5,
+        default=-3.0,
     )
     parser.add_argument(
         "--horizon_length_factor",

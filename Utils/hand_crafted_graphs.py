@@ -405,6 +405,8 @@ def get_Sioux_Falls_Network() -> tuple[int, dict]:
     weights = (
         jnp.ones((n_nodes, n_nodes), dtype=jnp.float16) * CTP_generator.NOT_CONNECTED
     )
+
+    # randomly sample for blocking prob
     blocking_prob = jnp.ones((n_nodes, n_nodes), dtype=jnp.float16)
 
     stored_graph = jnp.zeros((1, 3, n_nodes, n_nodes), dtype=jnp.float16)

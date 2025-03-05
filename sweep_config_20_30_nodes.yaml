@@ -1,6 +1,6 @@
 method: bayes               
 metric:
-  name: average_competitive_ratio    
+  name: multi_objective_metric 
   goal: minimize           
 parameters:
   clip_eps:
@@ -21,4 +21,7 @@ parameters:
   individual_reward_weight:
     min: 0.3
     max: 1.0
+  reward_exceed_horizon:
+    min: -2
+    max: -5
   

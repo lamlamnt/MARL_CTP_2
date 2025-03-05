@@ -7,7 +7,7 @@ parameters:
     min: 0.06
     max: 0.16
   vf_coeff:
-    min: 0.1
+    min: 0.11
     max: 0.22
   ent_coeff:
     min: 0.05
@@ -18,5 +18,7 @@ parameters:
   individual_reward_weight:
     min: 0.2
     max: 0.7
-  run_cap: 20
+  reward_exceed_horizon:
+    min: -2
+    max: -5
   
