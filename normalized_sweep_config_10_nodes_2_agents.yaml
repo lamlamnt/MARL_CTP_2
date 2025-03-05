@@ -1,6 +1,6 @@
 method: bayes               
 metric:
-  name: average_competitive_ratio    
+  name: multi_objective_metric  
   goal: minimize           
 parameters:
   clip_eps:
