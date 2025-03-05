@@ -19,6 +19,6 @@ parameters:
     min: 0.3
     max: 1.0
   reward_exceed_horizon:
-    min: -2
-    max: -5
+    min: -5.0
+    max: -2.0
   
