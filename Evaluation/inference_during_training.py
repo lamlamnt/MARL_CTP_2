@@ -178,6 +178,6 @@ def get_average_testing_stats(
 
     return (
         average_competitive_ratio,
-        mean_competitive_ratio_exclude_failures,
-        failure_rate,
+        jnp.float16(mean_competitive_ratio_exclude_failures),
+        jnp.float16(failure_rate),
     )
