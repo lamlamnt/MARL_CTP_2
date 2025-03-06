@@ -418,7 +418,7 @@ def main(args):
             lambda _: get_average_testing_stats(
                 testing_environment, agent, train_state.params, arguments
             ),
-            lambda _: (jnp.float16(0.0), jnp.float16(0, 0), jnp.float16(0, 0)),
+            lambda _: (jnp.float16(0.0), jnp.float16(0.0), jnp.float16(0.0)),
             None,
         )
 
@@ -499,7 +499,7 @@ def main(args):
             lambda _: get_average_testing_stats(
                 testing_environment, agent, train_state.params, arguments
             ),
-            lambda _: (jnp.float16(0.0), jnp.float16(0, 0), jnp.float16(0, 0)),
+            lambda _: (jnp.float16(0.0), jnp.float16(0.0), jnp.float16(0.0)),
             None,
         )
 
