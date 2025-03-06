@@ -5,31 +5,6 @@ import plotly.graph_objects as go
 import pandas as pd
 
 
-def plot_box_and_whisker():
-    box_stats = [
-        {"whislo": 5, "q1": 10, "med": 15, "q3": 20, "whishi": 25},  # First box
-        {"whislo": 7, "q1": 12, "med": 18, "q3": 22, "whishi": 30},  # Second box
-        {"whislo": 3, "q1": 8, "med": 14, "q3": 19, "whishi": 27},  # Third box
-    ]
-
-    # Create the box plot
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.bxp(box_stats, showfliers=False)  # showfliers=False removes outliers
-
-    # Set labels
-    ax.set_title("Box and Whisker Plot of the Competitive Ratio")
-    ax.set_xlabel("Different Methods")
-    ax.set_ylabel("Competitive Ratio")
-    ax.set_xticklabels(["Set 1", "Set 2", "Set 3"])  # Label each dataset
-
-    # Show plot
-    current_directory = os.getcwd()
-    parent_dir = os.path.dirname(current_directory)
-    log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
-    plt.savefig(os.path.join(log_directory, "box_whisker.png"))
-    plt.close()
-
-
 # Add optimistic baseline as well -> to get more box plots
 def plot_box_and_whisker_plotly():
     box_stats = [
@@ -173,23 +148,9 @@ def plot_box_and_whisker_plotly():
     fig.show()
 
 
-# Not sure how it would look for proper learning curves yet
-# Must have the same number of training steps and frequency of testing
-# Deal with Missing/NaN values (first 2 or 3 values) - not sure why they are there.
-# If can't figure out, then automatically interpolate
-def plot_multiple_learning_curves():
-    average_window = 5
-    num_steps_before_update = 5500
-    frequency_testing = 20
-    """
-    names = [
-        os.path.join("10_nodes_2_agents", "experiment_1_critic_individual"),
-        os.path.join("10_nodes_2_agents", "experiment_1_critic_team"),
-        os.path.join("10_nodes_2_agents", "experiment_2_critic_decay"),
-        os.path.join("10_nodes_2_agents", "experiment_1_critic_mixed_no_decay"),
-        os.path.join("10_nodes_2_agents", "experiment_1_critic_decay_best"),
-    ]
-    colors = ["red", "black", "green", "blue", "yellow"]
+def plot_learning_curve_general(
+    names, average_window, num_steps_before_update, frequency_testing, title
+):
     legend_labels = [
         "Individual",
         "Team",
@@ -197,13 +158,7 @@ def plot_multiple_learning_curves():
         "Mixed at 0.5",
         "Linear Decay From Mixed",
     ]
-    """
-    names = [
-        os.path.join("20_nodes_2_agents", "peachy-sweep-4"),
-        os.path.join("20_nodes_2_agents", "check_2_critics"),
-    ]
-    colors = ["red", "black"]
-    legend_labels = ["1 critic linear decay", "2 critics linear decay"]
+    colors = ["red", "black", "green", "blue", "yellow"]
     current_directory = os.getcwd()
     parent_dir = os.path.dirname(current_directory)
     log_directory_names = [os.path.join(parent_dir, "Logs", name) for name in names]
@@ -240,9 +195,7 @@ def plot_multiple_learning_curves():
             color="blue",
             alpha=0.2,
         )
-    plt.title(
-        "Learning Curve with Rolling Average for 20 Nodes 2 Agents 80% Stochastic Edges"
-    )
+    plt.title(title)
     plt.xlabel("Training Timesteps")
     plt.ylabel("Average Competitive Ratio")
     plt.legend()
@@ -251,29 +204,99 @@ def plot_multiple_learning_curves():
     plt.close()
 
 
-# Failure rate and percentage beats for 10, 20, and 30 nodes
+def plot_bar_graph_plotly_general(
+    groups,
+    categories,
+    values,
+    title,
+    x_axis_title,
+    y_axis_title,
+    colors,
+    shift_num_columns=None,
+):
+    # Bar positions
+    x_positions = [i for i in range(len(groups))]  # One position for each group
+    bar_width = 0.2  # Width of each bar
+
+    # Create figure
+    fig = go.Figure()
+
+    # Add bars for each category
+    for i, category in enumerate(categories):
+        if shift_num_columns is not None:
+            shift_num_columns = (i // 2) * 0.05
+        else:
+            shift = 0
+        fig.add_trace(
+            go.Bar(
+                x=[
+                    x - bar_width / 2 + i * bar_width + shift for x in x_positions
+                ],  # Adjust bar positions
+                y=[values[j][i] for j in range(len(groups))],  # Values for each group
+                name=category,
+                marker_color=colors[i],
+                width=bar_width,
+                text=[f"{values[j][i]:.2f}" for j in range(len(groups))],
+                textposition="outside",
+                texttemplate="%{text}",
+            )
+        )
+
+    # Update layout for better visualization
+    fig.update_layout(
+        title=title,
+        xaxis=dict(
+            tickvals=x_positions,
+            ticktext=groups,
+            title=x_axis_title,
+        ),
+        yaxis=dict(title=y_axis_title),
+        barmode="group",  # Grouped bars
+        bargap=0.2,  # Space between groups
+    )
+
+    # Show figure
+    fig.show()
+
+
+# Failure rate and percentage for 10, 20, and 30 nodes
 def plot_bar_graph_plotly():
     groups = [
         "10 nodes 2 agents prop 0.4",
         "10 nodes 2 agents prop 0.8",
+        "20 nodes 2 agents prop 0.4",
         "20 nodes 2 agents prop 0.8",
+        "20 nodes 4 agents prop 0.4",
+        "20 nodes 4 agents prop 0.8",
+        "30 nodes 2 agents prop 0.4",
+        "30 nodes 2 agents prop 0.8",
+        "30 nodes 4 agents prop 0.4",
+        "30 nodes 4 agents prop 0.8",
     ]
     categories = [
-        "Percentage of episodes Where RL beats or equals to the optimistic baseline",
-        "Failure Rate of RL",
-    ]  # Two bars per group
+        "Percentage of episodes where RL beats the optimistic baseline",
+        "Percentage of episodes where RL equals to the optimistic baseline",
+        "Failure rate of RL",
+    ]  # Three bars per group
     values = [
-        [65.68, 0.6214],  # 10 nodes 2 agents prop 0.4
-        [73.47, 1.36],  # 10 nodes 2 agents prop 0.8
-        [53.30, 4.96],  # 20 nodes 2 agents prop 0.8
+        [65.68, 0.6214, 1],  # 10 nodes 2 agents prop 0.4
+        [73.47, 1.36, 1],  # 10 nodes 2 agents prop 0.8
+        [1, 1, 1],  # 20 nodes 2 agents prop 0.4
+        [53.30, 4.96, 1],  # 20 nodes 2 agents prop 0.8
+        [1, 1, 1],  # 20 nodes 4 agents prop 0.4
+        [1, 1, 1],  # 20 nodes 4 agents prop 0.8
+        [1, 1, 1],  # 30 nodes 2 agents prop 0.4
+        [1, 1, 1],  # 30 nodes 2 agents prop 0.8
+        [1, 1, 1],  # 30 nodes 4 agents prop 0.4
+        [1, 1, 1],  # 30 nodes 4 agents prop 0.8
     ]
 
     # Bar positions
-    x_positions = [0, 1, 2]  # One position for each group
+    x_positions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  # One position for each group
     bar_width = 0.3  # Width of each bar
 
     # Colors for each category
-    colors = ["red", "blue"]
+    colors = ["red", "blue", "green"]
 
     # Create figure
     fig = go.Figure()
@@ -297,11 +320,11 @@ def plot_bar_graph_plotly():
 
     # Update layout for better visualization
     fig.update_layout(
-        title="Percentage of Episodes where RL Beats or Equals to the Optimistic Baseline and Failure Rate of RL",
+        title="Statistics for Different Number of Nodes and Agents",
         xaxis=dict(
             tickvals=x_positions,
             ticktext=groups,
-            title="Experiments",
+            title="Number of Nodes and Agents",
         ),
         yaxis=dict(title="Percentage (%)"),
         barmode="group",  # Grouped bars
@@ -312,68 +335,79 @@ def plot_bar_graph_plotly():
     fig.show()
 
 
-def plot_bar_graph():
-    # Problem: the legend being on the graph makes it hard to read the data
-    # 10 nodes 2 agents 0.4 and 0.8
-    # Data
-    groups = ["0.4", "0.8"]  # 2 groups
-    categories = [
-        "Optimistic Baseline",
-        "Individual Reward",
-        "Combined",
-        "Tean Reward",
-    ]  # 4 bars per group
-    values = np.array([[1.416, 1.071, 1.042, 1.046], [1.370, 1.275, 1.112, 1.173]])
-    pastel_colors = ["#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9"]
-
-    # Bar settings
-    bar_width = 0.15
-    x = np.arange(len(groups))  # Positions for groups
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(8, 5))
-
-    for i in range(len(categories)):
-        bars = ax.bar(
-            x + i * bar_width,
-            values[:, i],
-            width=bar_width,
-            label=categories[i],
-            color=pastel_colors[i],
-        )
-        # Add values on top of the bars
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                height,
-                f"{height:.3f}",
-                ha="center",
-                va="bottom",
-                fontsize=10,
-            )
-
-    # Labels and legend
-    ax.set_xticks(x + bar_width * 1.5)  # Center x-axis labels
-    ax.set_xticklabels(groups)
-    ax.set_ylabel("Average Competitive Ratio")
-    ax.set_title("10 Nodes 2 Agents")
-    ax.legend(
-        title="Prop Stoch",
-        loc="upper right",
-        bbox_to_anchor=(1.15, 1),
-        fontsize=6,
-        framealpha=0.8,
+def plot_mean_median():
+    groups = [
+        "10 nodes 2 agents",
+        "20 nodes 2 agents",
+        "20 nodes 4 agents",
+        "30 nodes 2 agents",
+        "30 nodes 4 agents",
+    ]
+    categories = ["Mean RL", "Mean Optimistic", "Median RL", "Median Optimistic"]
+    colors = [
+        "rgb(139, 0, 0)",
+        "rgb(255, 102, 102)",
+        "rgb(0, 0, 139)",
+        "rgb(102, 178, 255)",
+    ]  # dark red, light, red, dark blue, light blue
+    title = "Mean and Median of RL and Optimistic Baseline at Prop 0.8"
+    x_axis_title = "Number of Nodes and Agents"
+    y_axis_title = "Competitive Ratio"
+    values = [
+        [1.11, 1.08, 1.11, 1.08],
+        [1.243, 1.14, 1.243, 1.14],
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+        [1, 1, 1, 1],
+    ]
+    plot_bar_graph_plotly_general(
+        groups, categories, values, title, x_axis_title, y_axis_title, colors, 2
     )
 
-    current_directory = os.getcwd()
-    parent_dir = os.path.dirname(current_directory)
-    log_directory = os.path.join(parent_dir, "Logs/Unit_Tests")
-    plt.savefig(os.path.join(log_directory, "bar_graph.png"))
-    plt.close()
+
+def plot_percentage():
+    groups = [
+        "10 nodes 2 agents",
+        "20 nodes 2 agents",
+        "20 nodes 4 agents",
+        "30 nodes 2 agents",
+        "30 nodes 4 agents",
+    ]
+    categories = [
+        "Percentage RL Beats Optimistic",
+        "Percentage RL Equals Optimistic",
+        "Failure Rate RL",
+    ]
+    colors = ["red", "blue", "green"]
+    title = "Statistics for Different Number of Nodes and Agents for Prop 0.8"
+    x_axis_title = "Number of Nodes and Agents"
+    y_axis_title = "Percentage (%)"
+    values = [
+        [73.47, 1.36, 1],
+        [53.30, 4.96, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+        [1, 1, 1],
+    ]
+    plot_bar_graph_plotly_general(
+        groups, categories, values, title, x_axis_title, y_axis_title, colors
+    )
+
+
+def plot_learning_curve():
+    names = [
+        os.path.join("10_nodes_2_agents", "experiment_1_critic_individual"),
+        os.path.join("10_nodes_2_agents", "experiment_1_critic_team"),
+        os.path.join("10_nodes_2_agents", "experiment_2_critic_decay"),
+        os.path.join("10_nodes_2_agents", "experiment_1_critic_mixed_no_decay"),
+        os.path.join("10_nodes_2_agents", "experiment_1_critic_decay_best"),
+    ]
+    plot_learning_curve_general(
+        names, 5, 5500, 20, "Learning Curves for 10 Nodes 2 Agents"
+    )
 
 
 if __name__ == "__main__":
-    # plot_box_and_whisker_plotly()
-    plot_multiple_learning_curves()
-    # plot_bar_graph_plotly()
+    plot_mean_median()
+    # plot_percentage()
+    # plot_learning_curve()

@@ -74,6 +74,7 @@ def main(args):
         assert num_loops < args.sigmoid_total_nums_all // args.num_steps_before_update
         assert args.sigmoid_beginning_offset_num < args.sigmoid_total_nums_all
         assert args.anneal_individual_reward_weight != "linear"
+        assert args.load_network_directory is not None
     if args.anneal_individual_reward_weight == "linear_checkpoint":
         assert args.ent_coeff_schedule == "sigmoid_checkpoint"
     n_node = args.n_node
