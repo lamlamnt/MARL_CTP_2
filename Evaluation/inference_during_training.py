@@ -131,32 +131,6 @@ def get_average_testing_stats(
     episode_numbers = jnp.cumsum(test_all_episode_done)
     shifted_episode_numbers = jnp.concatenate([jnp.array([0]), episode_numbers[:-1]])
 
-    # ADDED LATER
-    # Calculate failure rate -> number of times the reward is divisible by reward_exceed_horizon/(max_shifted_episode_numbers+1)
-    failure_mask = jnp.where(
-        test_all_total_rewards % arguments["reward_exceed_horizon"] == 0, 1, 0
-    )
-    failure_rate = jnp.sum(failure_mask) / (jnp.max(shifted_episode_numbers) + 1)
-    num_successful_episodes = (
-        jnp.max(shifted_episode_numbers) + 1 - jnp.sum(failure_mask)
-    )
-
-    # To calculate mean competitive ratio excluding the failed episodes, make the rewards for failed episodes all 0. When calculating mean, divide by number of successful_episodes
-    failed_episodes = jax.ops.segment_max(
-        failure_mask, jnp.max(shifted_episode_numbers) + 1
-    )
-    # Remove the last incomplete episode
-    failed_episodes[-1] = 1
-    edited_rewards = jnp.where(
-        failed_episodes[shifted_episode_numbers], 0, test_all_total_rewards
-    )
-    edited_optimal_costs = jnp.where(
-        failed_episodes[shifted_episode_numbers], 0, test_all_optimal_costs
-    )
-    mean_competitive_ratio_exclude_failures = (
-        jnp.sum(edited_rewards) / jnp.sum(edited_optimal_costs)
-    ) / num_successful_episodes
-
     def aggregate_by_episode(episode_numbers, values, num_segments):
         return jax.ops.segment_sum(values, episode_numbers, num_segments=num_segments)
 
@@ -177,6 +151,31 @@ def get_average_testing_stats(
 
     # Get average competitive ratio
     average_competitive_ratio = jnp.mean(competitive_ratio)
+
+    # ADDED LATER
+    # Calculate failure rate -> number of times the reward is divisible by reward_exceed_horizon/(max_shifted_episode_numbers+1)
+    failure_mask = jnp.where(
+        test_all_total_rewards % arguments["reward_exceed_horizon"] == 0, 1, 0
+    )
+    failure_rate = jnp.sum(failure_mask) / (jnp.max(shifted_episode_numbers) + 1)
+    num_successful_episodes = (
+        jnp.max(shifted_episode_numbers) + 1 - jnp.sum(failure_mask)
+    )
+
+    # To calculate mean competitive ratio excluding the failed episodes, make the rewards for failed episodes all 0. When calculating mean, divide by number of successful_episodes
+    failed_episodes = jax.ops.segment_max(
+        failure_mask, shifted_episode_numbers, num_segments=min_num_episodes
+    )
+    edited_rewards = jnp.where(
+        failed_episodes[shifted_episode_numbers] == 1, 0, test_all_total_rewards
+    )
+    edited_optimal_costs = jnp.where(
+        failed_episodes[shifted_episode_numbers] == 1, 0, test_all_optimal_costs
+    )
+    mean_competitive_ratio_exclude_failures = (
+        jnp.sum(edited_rewards) / jnp.sum(edited_optimal_costs)
+    ) / num_successful_episodes
+
     return (
         average_competitive_ratio,
         mean_competitive_ratio_exclude_failures,
