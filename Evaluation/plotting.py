@@ -6,48 +6,65 @@ import wandb
 import jax.numpy as jnp
 
 
-def plot_learning_curve(testing_average_competitive_ratio, log_directory, args):
-    learning_curve_values = testing_average_competitive_ratio[
-        testing_average_competitive_ratio != 0
+def plot_learning_curve(
+    testing_average_competitive_ratio,
+    testing_average_competitive_ratio_exclude,
+    testing_failure_rate,
+    log_directory,
+    args,
+):
+    labels = [
+        "Competitive Ratio",
+        "Competitive Ratio (Excluding Failed Episodes)",
+        "Failure Rate (%)",
     ]
-    # Plot rolling average (mean and std) of competitive ratio
-    learning_curve_series = pd.Series(learning_curve_values)
-    rolling_mean = learning_curve_series.rolling(
-        window=args.learning_curve_average_window, min_periods=1
-    ).mean()
-    rolling_std = learning_curve_series.rolling(
-        window=args.learning_curve_average_window, min_periods=1
-    ).std()
-    plt.figure(figsize=(10, 6))
-    plt.plot(
-        args.num_steps_before_update
-        * args.frequency_testing
-        * jnp.arange(len(learning_curve_values)),
-        rolling_mean,
-        linestyle="-",
-        color="red",
-    )
-    plt.fill_between(
-        args.num_steps_before_update
-        * args.frequency_testing
-        * jnp.arange(len(learning_curve_values)),
-        rolling_mean - rolling_std,
-        rolling_mean + rolling_std,
-        color="blue",
-        alpha=0.2,
-    )
-    plt.title("Learning Curve with Rolling Average")
-    plt.xlabel("Training Timesteps")
-    plt.ylabel("Average Competitive Ratio")
-    plt.savefig(os.path.join(log_directory, "Smoothened_Learning_Curve.png"))
-    plt.close()
+    out = {
+        "Competitive Ratio": testing_average_competitive_ratio,
+        "Competitive Ratio (Excluding Failed Episodes)": testing_average_competitive_ratio_exclude,
+        "Failure Rate (%)": testing_failure_rate,
+    }
+    for i in range(3):
+        learning_curve_values = out[labels[i]][out[labels[i]] != 0]
+        # Plot rolling average (mean and std) of competitive ratio
+        learning_curve_series = pd.Series(learning_curve_values)
+        rolling_mean = learning_curve_series.rolling(
+            window=args.learning_curve_average_window, min_periods=1
+        ).mean()
+        rolling_std = learning_curve_series.rolling(
+            window=args.learning_curve_average_window, min_periods=1
+        ).std()
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            args.num_steps_before_update
+            * args.frequency_testing
+            * jnp.arange(len(learning_curve_values)),
+            rolling_mean,
+            linestyle="-",
+            color="red",
+        )
+        plt.fill_between(
+            args.num_steps_before_update
+            * args.frequency_testing
+            * jnp.arange(len(learning_curve_values)),
+            rolling_mean - rolling_std,
+            rolling_mean + rolling_std,
+            color="blue",
+            alpha=0.2,
+        )
+        plt.title("Learning Curve with Rolling Average")
+        plt.xlabel("Training Timesteps")
+        plt.ylabel(labels[i])
+        plt.savefig(
+            os.path.join(log_directory, "Smoothened_Learning_Curve_" + str(i) + ".png")
+        )
+        plt.close()
 
-    # Store the learning curve values (the Pandas series) in a .csv file
-    learning_curve_series.to_csv(
-        os.path.join(log_directory, "learning_curve_series.csv"),
-        index=False,
-        encoding="utf-8",
-    )
+        # Store the learning curve values (the Pandas series) in a .csv file
+        learning_curve_series.to_csv(
+            os.path.join(log_directory, "learning_curve_series_" + str(i) + ".csv"),
+            index=False,
+            encoding="utf-8",
+        )
 
 
 def save_data_and_plotting(
@@ -218,8 +235,10 @@ def save_data_and_plotting(
                 ).mean()
                 * 100
             ),
-            "multi_objective_metric": 0.5 * failure_rate
-            + 0.5 * average_competitive_ratio_exclude,
+            "multi_objective_metric": 0.33 * failure_rate
+            + 0.67
+            * average_competitive_ratio_exclude
+            * average_competitive_ratio_exclude,
         }
         for key, value in result_dict.items():
             wandb.summary[key] = value

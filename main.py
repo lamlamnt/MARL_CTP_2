@@ -409,12 +409,16 @@ def main(args):
 
         # Perform inference (using testing environment) (if loop_count divisible by 50 for example - tunable)
         # Get average and store in metrics, just like loss
-        testing_average_competitive_ratio = jax.lax.cond(
+        (
+            testing_average_competitive_ratio,
+            testing_average_competitive_ratio_exclude,
+            testing_failure_rate,
+        ) = jax.lax.cond(
             loop_count % args.frequency_testing == 0,
             lambda _: get_average_testing_stats(
                 testing_environment, agent, train_state.params, arguments
             ),
-            lambda _: jnp.float16(0.0),
+            lambda _: (jnp.float16(0.0), jnp.float16(0, 0), jnp.float16(0, 0)),
             None,
         )
 
@@ -427,6 +431,8 @@ def main(args):
             "all_episode_done": jnp.all(traj_batch.done, axis=1),
             "all_optimal_costs": traj_batch.shortest_path,
             "testing_average_competitive_ratio": testing_average_competitive_ratio,
+            "testing_average_competitive_ratio_exclude": testing_average_competitive_ratio_exclude,
+            "testing_failure_rate": testing_failure_rate,
         }
         return runner_state, metrics
 
@@ -484,12 +490,16 @@ def main(args):
 
         # Perform inference (using testing environment) (if loop_count divisible by 50 for example - tunable)
         # Get average and store in metrics, just like loss
-        testing_average_competitive_ratio = jax.lax.cond(
+        (
+            testing_average_competitive_ratio,
+            testing_average_competitive_ratio_exclude,
+            testing_failure_rate,
+        ) = jax.lax.cond(
             loop_count % args.frequency_testing == 0,
             lambda _: get_average_testing_stats(
                 testing_environment, agent, train_state.params, arguments
             ),
-            lambda _: jnp.float16(0.0),
+            lambda _: (jnp.float16(0.0), jnp.float16(0, 0), jnp.float16(0, 0)),
             None,
         )
 
@@ -502,6 +512,8 @@ def main(args):
             "all_episode_done": jnp.all(traj_batch.done, axis=1),
             "all_optimal_costs": traj_batch.shortest_path,
             "testing_average_competitive_ratio": testing_average_competitive_ratio,
+            "testing_average_competitive_ratio_exclude": testing_average_competitive_ratio_exclude,
+            "testing_failure_rate": testing_failure_rate,
         }
         return runner_state, metrics
 

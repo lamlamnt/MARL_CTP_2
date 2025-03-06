@@ -60,7 +60,13 @@ def plotting_inference(
     )
 
     # Plot learning curve
-    plot_learning_curve(out["testing_average_competitive_ratio"], log_directory, args)
+    plot_learning_curve(
+        out["testing_average_competitive_ratio"],
+        out["testing_average_competitive_ratio_exclude"],
+        out["failure_rate"],
+        log_directory,
+        args,
+    )
 
     # Evaluate the model
     print("Start evaluating ...")
