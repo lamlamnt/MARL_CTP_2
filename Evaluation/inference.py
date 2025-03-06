@@ -63,7 +63,7 @@ def plotting_inference(
     plot_learning_curve(
         out["testing_average_competitive_ratio"],
         out["testing_average_competitive_ratio_exclude"],
-        out["failure_rate"],
+        out["testing_failure_rate"],
         log_directory,
         args,
     )
