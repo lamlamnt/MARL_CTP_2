@@ -163,7 +163,9 @@ def get_average_testing_stats(
     failed_episodes = jax.ops.segment_max(
         failure_mask, shifted_episode_numbers, num_segments=min_num_episodes
     )
-    num_successful_episodes = min_num_episodes - jnp.sum(failed_episodes)
+    num_successful_episodes = min_num_episodes - jnp.sum(
+        failure_mask[:min_num_episodes]
+    )
     edited_rewards = jnp.where(
         failed_episodes[shifted_episode_numbers] == 1, 0, test_all_total_rewards
     )
