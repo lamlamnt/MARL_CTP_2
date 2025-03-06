@@ -99,7 +99,14 @@ class PPO:
         frac = jax.lax.cond(
             self.individual_reward_weight_schedule == "constant",
             lambda _: 1.0,
-            lambda _: 1.0 - loop_count / self.num_loops,
+            lambda _: jax.lax.cond(
+                self.individual_reward_weight_schedule == "linear",
+                lambda _: 1.0 - loop_count / self.num_loops,
+                lambda _: 1.0
+                - (loop_count + self.sigmoid_beginning_offset_num)
+                / self.sigmoid_total_nums_all,
+                operand=None,
+            ),
             operand=None,
         )
         return self.individual_reward_weight * frac

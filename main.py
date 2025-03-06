@@ -73,6 +73,9 @@ def main(args):
     if args.ent_coeff_schedule == "sigmoid_checkpoint":
         assert num_loops < args.sigmoid_total_nums_all // args.num_steps_before_update
         assert args.sigmoid_beginning_offset_num < args.sigmoid_total_nums_all
+        assert args.anneal_individual_reward_weight != "linear"
+    if args.anneal_individual_reward_weight == "linear_checkpoint":
+        assert args.ent_coeff_schedule == "sigmoid_checkpoint"
     n_node = args.n_node
     if args.num_critic_values != 1 and args.num_critic_values != 2:
         raise ValueError("num_critic_values must be 1 or 2")
@@ -857,7 +860,7 @@ if __name__ == "__main__":
         type=str,
         default="linear",
         required=False,
-        help="Options: constant, linear. The arg individual_reward_weight is the starting weight. Constant or linear annealing to 0.0 over time during training",
+        help="Options: constant, linear, linear_checkpoint. The arg individual_reward_weight is the starting weight. Constant or linear annealing to 0.0 over time during training",
     )
 
     # Hyperparameters specific to autoencoder
