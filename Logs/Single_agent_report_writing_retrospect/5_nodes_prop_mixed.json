@@ -1,0 +1,19 @@
+Results excluding failed episodes
+{
+    "average_competitive_ratio_excluding_failed_episodes": 1.0236140489578247,
+    "median_competitive_ratio_exclude": 1.0,
+    "min_competitive_ratio_exclude": 0.9903846383094788,
+    "first_quartile_competitive_ratio_exclude": 1.0,
+    "third_quartile_competitive_ratio_exclude": 1.0,
+    "max_competitive_ratio_exclude": 2.2608695030212402,
+    "standard_deviation_of_competitive_ratio_exclude": 0.1131414920091629,
+    "average_competitive_ratio_of_optimistic_baseline_exclude": 1.0542364120483398,
+    "max_competitive_ratio_of_optimistic_baseline_exclude": 2.5643563270568848,
+    "median_competitive_ratio_of_optimistic_baseline_exclude": 1.0,
+    "min_competitive_ratio_of_optimistic_baseline_exclude": 1.0,
+    "first_quartile_competitive_ratio_of_optimistic_baseline_exclude": 1.0,
+    "third_quartile_competitive_ratio_of_optimistic_baseline_exclude": 1.0,
+    "standard_deviation_competitive_ratio_of_optimistic_baseline_exclude": 0.19357091188430786,
+    "percentage_RL_beats_optimistic_baseline": 9.622501850481125,
+    "percentage_RL_equals_to_optimistic_baseline": 84.4559585492228
+}
