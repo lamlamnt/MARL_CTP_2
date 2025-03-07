@@ -1,13 +1,15 @@
 import jax.numpy as jnp
 import jax
 
-test_all_total_rewards = jnp.array([-0.2, -0.3, -1.5, -0.4, -0.8, -2.5, -0.9, -1.1])
+test_all_total_rewards = jnp.array([-0.2, -0.3, -1.5, -0.4, -3, -4.5, -0.9, -1.1])
 test_all_optimal_costs = jnp.array([1.1, 0, 0, 1.1, 0, 1.1, 1.1, 0])
 shifted_episode_numbers = jnp.array([0, 0, 0, 1, 1, 2, 3, 3])
 min_num_episodes = 3
 
 failure_mask = jnp.where((test_all_total_rewards % -1.5) == 0, 1, 0)
+print(failure_mask)
 failure_rate = jnp.sum(failure_mask) * 100 / (jnp.max(shifted_episode_numbers) + 1)
+print(failure_rate)
 # To calculate mean competitive ratio excluding the failed episodes, make the rewards for failed episodes and all the later episodes all 0. When calculating mean, divide by number of successful_episodes
 failed_episodes = jax.ops.segment_max(
     failure_mask, shifted_episode_numbers, num_segments=min_num_episodes

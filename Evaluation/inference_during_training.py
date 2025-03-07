@@ -29,6 +29,7 @@ def get_average_testing_stats(
             key,
             timestep_in_episode,
             previous_episode_done,
+            failure_counter,
         ) = runner_state
         action_key, env_key = jax.random.split(key, 2)
         # Agent acts
@@ -49,25 +50,32 @@ def get_average_testing_stats(
         )
 
         # Reset if exceed horizon length. Otherwise, increment
-        new_env_state, new_belief_states, rewards, timestep_in_episode, dones = (
-            jax.lax.cond(
-                timestep_in_episode
-                >= (arguments["horizon_length_factor"] * arguments["n_node"]),
-                lambda _: (
-                    *environment.reset(reset_key),
-                    reward_agent_exceed_horizon,
-                    0,
-                    jnp.full(arguments["n_agent"], True, dtype=bool),
-                ),
-                lambda _: (
-                    new_env_state,
-                    new_belief_states,
-                    rewards,
-                    timestep_in_episode + 1,
-                    dones,
-                ),
-                operand=None,
-            )
+        (
+            new_env_state,
+            new_belief_states,
+            rewards,
+            timestep_in_episode,
+            dones,
+            failure_counter,
+        ) = jax.lax.cond(
+            timestep_in_episode
+            >= (arguments["horizon_length_factor"] * arguments["n_node"]),
+            lambda _: (
+                *environment.reset(reset_key),
+                reward_agent_exceed_horizon,
+                0,
+                jnp.full(arguments["n_agent"], True, dtype=bool),
+                failure_counter + 1,
+            ),
+            lambda _: (
+                new_env_state,
+                new_belief_states,
+                rewards,
+                timestep_in_episode + 1,
+                dones,
+                failure_counter,
+            ),
+            operand=None,
         )
 
         # Calculate shortest total cost at the beginning of the episode. But we don't need this for training
@@ -104,6 +112,7 @@ def get_average_testing_stats(
             env_key,
             timestep_in_episode,
             episode_done,
+            failure_counter,
         )
         transition = (
             episode_done,
@@ -118,6 +127,7 @@ def get_average_testing_stats(
         env_key,
         jnp.int32(0),
         jnp.bool_(True),
+        jnp.int32(0),
     )
     runner_state, inference_traj_batch = jax.lax.scan(
         _one_step_inference, runner_state, jnp.arange(num_testing_timesteps)
@@ -126,6 +136,7 @@ def get_average_testing_stats(
     test_all_episode_done = inference_traj_batch[0]
     test_all_total_rewards = inference_traj_batch[1]
     test_all_optimal_costs = inference_traj_batch[2]
+    failure_counter = runner_state[-1]
 
     # Calculate competitive ratio without using pandas
     episode_numbers = jnp.cumsum(test_all_episode_done)
@@ -157,7 +168,11 @@ def get_average_testing_stats(
     failure_mask = jnp.where(
         (test_all_total_rewards % arguments["reward_exceed_horizon"]) == 0, 1, 0
     )
-    failure_rate = jnp.sum(failure_mask) * 100 / (jnp.max(shifted_episode_numbers) + 1)
+    failure_rate = failure_counter * 100 / (jnp.max(shifted_episode_numbers) + 1)
+    # safety measure
+    failure_rate = jax.lax.cond(
+        failure_rate > 100, lambda _: 100.0, lambda _: failure_rate, operand=None
+    )
 
     # To calculate mean competitive ratio excluding the failed episodes, make the rewards for failed episodes and all the later episodes all 0. When calculating mean, divide by number of successful_episodes
     failed_episodes = jax.ops.segment_max(
@@ -187,6 +202,12 @@ def get_average_testing_stats(
     )
     mean_competitive_ratio_exclude_failures = (
         jnp.sum(competitive_ratio_exclude_failures) / num_successful_episodes
+    )
+    mean_competitive_ratio_exclude_failures = jax.lax.cond(
+        num_successful_episodes == 0,
+        lambda _: jnp.float16(10.0),
+        lambda _: mean_competitive_ratio_exclude_failures,
+        operand=None,
     )
 
     return (
