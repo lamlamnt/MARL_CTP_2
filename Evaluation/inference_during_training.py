@@ -204,7 +204,7 @@ def get_average_testing_stats(
         jnp.sum(competitive_ratio_exclude_failures) / num_successful_episodes
     )
     mean_competitive_ratio_exclude_failures = jax.lax.cond(
-        num_successful_episodes == 0,
+        num_successful_episodes <= 0,
         lambda _: jnp.float16(10.0),
         lambda _: mean_competitive_ratio_exclude_failures,
         operand=None,
