@@ -1,0 +1,17 @@
+method: bayes               
+metric:
+  name: final_validation_loss
+  goal: minimize           
+parameters:
+  learning_rate:
+    min: 0.0001
+    max: 0.1
+  weight_decay:
+    min: 0.00001
+    max: 0.1
+  hidden_size:
+    min: 10
+    max: 100 
+  latent_size:
+    min: 50
+    max: 170

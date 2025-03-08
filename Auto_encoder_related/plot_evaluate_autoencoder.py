@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 from datetime import datetime
+import wandb
 
 sys.path.append("..")
 from Evaluation.inference import extract_params
@@ -53,4 +54,8 @@ def plot_store_results_autoencoder(log_directory, start_time, model_params, out,
             fh.write(f"{layer_name}: {weights.shape}\n")
         total_num_params = sum(p.size for p in jax.tree_util.tree_leaves(model_params))
         fh.write("Total number of parameters in the network: " + str(total_num_params))
+
+    # Log into wandb
+    wandb.summary["final_training_loss"] = float(out["training_loss"][-1])
+    wandb.summary["final_validation_loss"] = float(out["validation_loss"][-1])
     print("All done!")

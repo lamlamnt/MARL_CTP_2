@@ -30,6 +30,7 @@ from Auto_encoder_related.training_step import train_step, loss_fn
 from Auto_encoder_related.plot_evaluate_autoencoder import (
     plot_store_results_autoencoder,
 )
+from Auto_encoder_related.random_walk import Random_Agent
 
 NUM_CHANNELS_IN_BELIEF_STATE = 6
 
@@ -182,9 +183,40 @@ def main(args):
         timestep_in_episode,
     )
 
+    num_steps_collect_with_ppo = args.num_steps_to_collect * (
+        1 - args.percent_random_walk
+    )
+    num_steps_collect_with_random_walk = (
+        args.num_steps_to_collect * args.percent_random_walk
+    )
+    random_agent = Random_Agent(
+        environment,
+        args.horizon_length_factor * args.n_node,
+        args.reward_exceed_horizon,
+        args.n_agent,
+    )
+    testing_random_agent = Random_Agent(
+        testing_environment,
+        args.horizon_length_factor * args.n_node,
+        args.reward_exceed_horizon,
+        args.n_agent,
+    )
+
     # Use the testing environment to collect a validation set (used for all epochs)
-    _, validation_set = jax.lax.scan(
-        testing_ppo_agent.env_step, runner_state, None, args.validation_set_size
+    _, ppo_validation_set = jax.lax.scan(
+        testing_ppo_agent.env_step,
+        runner_state,
+        None,
+        args.validation_set_size * (1 - args.percent_random_walk),
+    )
+    _, random_validation_set = jax.lax.scan(
+        testing_random_agent.env_step,
+        runner_state,
+        None,
+        args.validation_set_size * args.percent_random_walk,
+    )
+    validation_set = jnp.concatenate(
+        (ppo_validation_set, random_validation_set), axis=0
     )
     validation_set = jnp.reshape(validation_set, (-1,) + validation_set.shape[2:])
 
@@ -195,9 +227,16 @@ def main(args):
     @scan_tqdm(args.num_epochs)
     def _update_step(runner_state, unused):
         # Collect trajectories.
-        runner_state, traj_batch = jax.lax.scan(
-            ppo_agent.env_step, runner_state, None, args.num_steps_to_collect
+        runner_state_random, traj_batch_random = jax.lax.scan(
+            random_agent.env_step,
+            runner_state,
+            None,
+            num_steps_collect_with_random_walk,
         )
+        runner_state, traj_batch_ppo = jax.lax.scan(
+            ppo_agent.env_step, runner_state, None, num_steps_collect_with_ppo
+        )
+        traj_batch = jnp.concatenate((traj_batch_ppo, traj_batch_random), axis=0)
         (
             ppo_train_state,
             autoencoder_train_state,
@@ -353,7 +392,7 @@ if __name__ == "__main__":
         type=int,
         help="Number of epochs to train the autoencoder",
         required=False,
-        default=200,
+        default=250,
     )
     parser.add_argument("--learning_rate", type=float, required=False, default=0.001)
     parser.add_argument(
@@ -372,6 +411,13 @@ if __name__ == "__main__":
         help="Number of channels of the first convolutional layer in the encoder",
     )
     parser.add_argument("--latent_size", type=int, required=False, default=170)
+    parser.add_argument(
+        "--percent_random_walk",
+        type=float,
+        required=False,
+        default=0.3,
+        help="Percentage of steps collected that are random walks (to ensure that the autoencoder sees diverse states)",
+    )
 
     # Args related to evaluation
     parser.add_argument(
@@ -397,7 +443,7 @@ if __name__ == "__main__":
         "--wandb_project_name", type=str, required=False, default="no_name"
     )
     parser.add_argument(
-        "--yaml_file", type=str, required=False, default="sweep_config_node_10.yaml"
+        "--yaml_file", type=str, required=False, default="sweep_autoencoder.yaml"
     )
     parser.add_argument(
         "--wandb_sweep",

@@ -37,9 +37,10 @@ from Utils.load_store_graphs import load_graphs, store_graphs
 from Utils.hand_crafted_graphs import (
     get_go_past_goal_without_servicing_graph,
     get_smaller_index_agent_behaves_differently_graph,
-    get_sacrifice_in_exploring_graph,
+    get_no_sacrifice_in_exploring_graph,
     get_sacrifice_in_choosing_goals_graph,
     get_dynamic_choose_goal_graph,
+    sacrifice_in_exploring_graph,
 )
 from Networks.autoencoder import Autoencoder
 import re
@@ -51,14 +52,16 @@ NUM_CHANNELS_IN_BELIEF_STATE = 6
 def decide_hand_crafted_graph(args):
     if args.hand_crafted_graph == "sacrifice_in_choosing_goals":
         n_node, defined_graph = get_sacrifice_in_choosing_goals_graph()
-    elif args.hand_crafted_graph == "sacrifice_in_exploring":
-        n_node, defined_graph = get_sacrifice_in_exploring_graph()
+    elif args.hand_crafted_graph == "no_sacrifice_in_exploring":
+        n_node, defined_graph = get_no_sacrifice_in_exploring_graph()
     elif args.hand_crafted_graph == "smaller_index_agent_behaves_differently":
         n_node, defined_graph = get_smaller_index_agent_behaves_differently_graph()
     elif args.hand_crafted_graph == "go_past_goal_without_servicing":
         n_node, defined_graph = get_go_past_goal_without_servicing_graph()
     elif args.hand_crafted_graph == "dynamic_choose_goals":
         n_node, defined_graph = get_dynamic_choose_goal_graph()
+    elif args.hand_crafted_graph == "sacrifice_in_exploring":
+        n_node, defined_graph = sacrifice_in_exploring_graph()
     else:
         raise ValueError("Invalid hand_crafted_graph")
     return n_node, defined_graph
@@ -676,7 +679,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--hand_crafted_graph",
         type=str,
-        help="Options: None, dynamic_choose_goals, sacrifice_in_choosing_goals, sacrifice_in_exploring, smaller_index_agent_behaves_differently, go_past_goal_without_servicing. If anything other than None is specified, all other args relating to environment such as num of nodes are ignored.",
+        help="Options: None, dynamic_choose_goals, sacrifice_in_choosing_goals, no_sacrifice_in_exploring, sacrifice_in_exploring, smaller_index_agent_behaves_differently, go_past_goal_without_servicing. If anything other than None is specified, all other args relating to environment such as num of nodes are ignored.",
         required=False,
         default="None",
     )
