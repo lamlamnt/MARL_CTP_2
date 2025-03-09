@@ -40,7 +40,7 @@ from Utils.hand_crafted_graphs import (
     get_no_sacrifice_in_exploring_graph,
     get_sacrifice_in_choosing_goals_graph,
     get_dynamic_choose_goal_graph,
-    sacrifice_in_exploring_graph,
+    get_sacrifice_in_exploring_graph,
 )
 from Networks.autoencoder import Autoencoder
 import re
@@ -61,7 +61,7 @@ def decide_hand_crafted_graph(args):
     elif args.hand_crafted_graph == "dynamic_choose_goals":
         n_node, defined_graph = get_dynamic_choose_goal_graph()
     elif args.hand_crafted_graph == "sacrifice_in_exploring":
-        n_node, defined_graph = sacrifice_in_exploring_graph()
+        n_node, defined_graph = get_sacrifice_in_exploring_graph()
     else:
         raise ValueError("Invalid hand_crafted_graph")
     return n_node, defined_graph

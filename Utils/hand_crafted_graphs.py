@@ -421,7 +421,7 @@ def get_Sioux_Falls_Network() -> tuple[int, dict]:
     return (n_nodes, stored_graph)
 
 
-def sacrifice_in_exploring_graph() -> tuple[int, dict]:
+def get_sacrifice_in_exploring_graph() -> tuple[int, dict]:
     n_nodes = 9
     weights = jnp.array(
         [
@@ -524,7 +524,8 @@ def sacrifice_in_exploring_graph() -> tuple[int, dict]:
                 CTP_generator.NOT_CONNECTED,
                 CTP_generator.NOT_CONNECTED,
             ],
-        ]
+        ],
+        dtype=jnp.float16,
     )
     blocking_prob = jnp.array(
         [
@@ -537,7 +538,8 @@ def sacrifice_in_exploring_graph() -> tuple[int, dict]:
             [1, 1, 0, 1, 1, 1, 1, 0, 1],
             [1, 1, 1, 1, 1, 0, 0, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ]
+        ],
+        dtype=jnp.float16,
     )
     assert jnp.all(weights == weights.T)
     assert jnp.all(blocking_prob == blocking_prob.T)
