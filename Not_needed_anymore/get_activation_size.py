@@ -11,4 +11,4 @@ from Networks.densenet import DenseNet_ActorCritic_Same
 if __name__ == "__main__":
     model = DenseNet_ActorCritic_Same(30, growth_rate=40)
     key = jax.random.PRNGKey(100)
-    params = model.init(key, jnp.ones((6, 32, 30)))
+    params = model.init(key, jnp.ones((6, 34, 30)))
