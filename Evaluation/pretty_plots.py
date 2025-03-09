@@ -408,6 +408,9 @@ def plot_learning_curve():
 
 
 # Scatter plot of GB, number of parameters, and total size of all output layers vs performance (maybe multi-objective metric)
+def scatter_plot():
+    pass
+
 
 if __name__ == "__main__":
     plot_mean_median()

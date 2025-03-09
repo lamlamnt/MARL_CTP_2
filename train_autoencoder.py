@@ -159,6 +159,7 @@ def main(args):
         hidden_size=args.hidden_size,
         latent_size=args.latent_size,
         output_size=state_shape,
+        kernel_size=args.kernel_size,
     )
     autoencoder_init_params = autoencoder_model.init(
         jax.random.PRNGKey(0),
@@ -408,7 +409,7 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=48,
-        help="Number of channels of the first convolutional layer in the encoder",
+        help="Number of channels of the first convolutional layer in the encoder. Must be divisible by 8",
     )
     parser.add_argument("--latent_size", type=int, required=False, default=170)
     parser.add_argument(
@@ -418,6 +419,7 @@ if __name__ == "__main__":
         default=0.3,
         help="Percentage of steps collected that are random walks (to ensure that the autoencoder sees diverse states)",
     )
+    parser.add_argument("--kernel_size", type=int, required=False, default=4)
 
     # Args related to evaluation
     parser.add_argument(

@@ -10,8 +10,15 @@ parameters:
     min: 0.00001
     max: 0.1
   hidden_size:
-    min: 10
-    max: 100 
+    distribution: q_uniform
+    min: 24
+    max: 96
+    q: 8
   latent_size:
     min: 50
     max: 170
+  kernel_size:
+    min: 1
+    max: 5
+    type: int
+  
