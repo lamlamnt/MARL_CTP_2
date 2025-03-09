@@ -407,6 +407,8 @@ def plot_learning_curve():
     )
 
 
+# Scatter plot of memory metric vs performance (maybe multi-objective metric)
+
 if __name__ == "__main__":
     plot_mean_median()
     # plot_percentage()
