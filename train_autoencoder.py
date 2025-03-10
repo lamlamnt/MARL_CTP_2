@@ -234,7 +234,7 @@ def main(args):
     @scan_tqdm(args.num_epochs)
     def _update_step(runner_state, unused):
         # Collect trajectories.
-        runner_state_random, traj_batch_random = jax.lax.scan(
+        runner_state_random_next, traj_batch_random = jax.lax.scan(
             random_agent.env_step,
             runner_state_random,
             None,
