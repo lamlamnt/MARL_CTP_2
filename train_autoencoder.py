@@ -236,7 +236,7 @@ def main(args):
         # Collect trajectories.
         runner_state_random, traj_batch_random = jax.lax.scan(
             random_agent.env_step,
-            runner_state,
+            runner_state_random,
             None,
             num_steps_collect_with_random_walk,
         )
