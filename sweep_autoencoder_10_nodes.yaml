@@ -18,7 +18,8 @@ parameters:
     min: 50
     max: 170
   kernel_size:
+    distribution: q_uniform
     min: 1
     max: 5
-    type: int
+    q: 1
   

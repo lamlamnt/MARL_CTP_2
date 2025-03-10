@@ -183,6 +183,12 @@ def main(args):
         env_action_key,
         timestep_in_episode,
     )
+    runner_state_random = (
+        new_env_state,
+        new_belief_states,
+        env_action_key,
+        timestep_in_episode,
+    )
 
     num_steps_collect_with_ppo = args.num_steps_to_collect * (
         1 - args.percent_random_walk
@@ -212,7 +218,7 @@ def main(args):
     )
     _, random_validation_set = jax.lax.scan(
         testing_random_agent.env_step,
-        runner_state,
+        runner_state_random,
         None,
         args.validation_set_size * args.percent_random_walk,
     )
