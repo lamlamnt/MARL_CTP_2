@@ -11,11 +11,11 @@ reward_exceed_horizon = -1.5
 root_directory = "C:\\Users\\shala\\Documents\\Oxford Undergrad\\4th Year\\4YP\\Code\\Not_pushed_to_git"
 overall_folder_name = "generalize_node10_results_3_random_seeds"
 names = [
-    "prop_mixed_30",
-    "prop_mixed_32",
-    "prop_mixed_34",
+    "prop_0.8_30",
+    "prop_0.8_32",
+    "prop_0.8_34",
 ]
-name_of_json_file = "10_nodes_prop_mixed.json"
+name_of_json_file = "10_nodes_prop_0.8.json"
 df_list = []
 for name in names:
     file_path = os.path.join(

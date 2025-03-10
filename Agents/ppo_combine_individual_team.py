@@ -100,7 +100,14 @@ class PPO_2_Critic_Values:
         frac = jax.lax.cond(
             self.individual_reward_weight_schedule == "constant",
             lambda _: 1.0,
-            lambda _: 1.0 - loop_count / self.num_loops,
+            lambda _: jax.lax.cond(
+                self.individual_reward_weight_schedule == "linear",
+                lambda _: 1.0 - loop_count / self.num_loops,
+                lambda _: 1.0
+                - (loop_count + self.sigmoid_beginning_offset_num)
+                / self.sigmoid_total_nums_all,
+                operand=None,
+            ),
             operand=None,
         )
         return self.individual_reward_weight * frac
@@ -273,26 +280,27 @@ class PPO_2_Critic_Values:
             broadcasted_team_reward = jnp.broadcast_to(team_reward, reward.shape)
             individual_delta = (
                 reward
-                + self.discount_factor * next_value[0] * (1 - done)
-                - critic_value[0]
+                + self.discount_factor * next_value[:, 0] * (1 - done)
+                - critic_value[:, 0]
             )
             team_delta = (
                 broadcasted_team_reward
-                + self.discount_factor * next_value[1] * (1 - done)
-                - critic_value[1]
+                + self.discount_factor * next_value[:, 1] * (1 - done)
+                - critic_value[:, 1]
             )
             # separate delta and gae
             individual_gae = (
                 individual_delta
-                + self.discount_factor * self.gae_lambda * (1 - done) * gae[0]
+                + self.discount_factor * self.gae_lambda * (1 - done) * gae[:, 0]
             )
             team_gae = (
                 team_delta
-                + self.discount_factor * self.gae_lambda * (1 - done) * gae[1]
+                + self.discount_factor * self.gae_lambda * (1 - done) * gae[:, 1]
             )
-            return (jnp.stack([individual_gae, team_gae]), critic_value), jnp.stack(
-                [individual_gae, team_gae]
-            )
+            return (
+                jnp.stack([individual_gae, team_gae], axis=1),
+                critic_value,
+            ), jnp.stack([individual_gae, team_gae], axis=1)
 
         # Apply get_advantage to each element in traj_batch
         _, advantages = jax.lax.scan(
