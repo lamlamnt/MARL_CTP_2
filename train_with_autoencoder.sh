@@ -7,3 +7,11 @@ CUDA_VISIBLE_DEVICES=0 python main.py --n_node 10 --n_agent 2 --time_steps 40000
 #Sweep for autoencoder:
 #COPIED OVER BEST 10 nodes network
 CUDA_VISIBLE_DEVICES=1 python train_autoencoder.py --n_node 10 --n_agent 2 --load_network_directory "best_10_nodes" --graph_identifier "normalized_node_10_agent_2_prop_0.8" --log_directory "sweep_autoencoder_training" --autoencoder_weights_file "autoencoder_weights.flax" --prop_stoch 0.8 --wandb_mode online --wandb_project_name sweep_autoencoder_training --wandb_sweep True --sweep_run_count 30 --yaml_file "sweep_autoencoder_10_nodes.yaml"
+
+#Autoencoder for 20 nodes_2_agents
+
+#Autoencoder for 20 nodes_4_agents
+
+#Autoencoder for 30 nodes 2 agents
+
+#Autoencoder for 30 nodes 4 agents

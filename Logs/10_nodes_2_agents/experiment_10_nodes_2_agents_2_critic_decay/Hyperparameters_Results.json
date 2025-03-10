@@ -1,30 +1,30 @@
-{"n_node": 10, "n_agent": 2, "time_steps": 4000000, "reward_for_invalid_action": -200.0, "reward_service_goal": -0.1, "reward_fail_to_service_goal_larger_index": -0.61, "reward_exceed_horizon": -4.7, "horizon_length_factor": 2, "prop_stoch": 0.8, "k_edges": null, "random_seed_for_training": 100, "random_seed_for_inference": 101, "discount_factor": 1.0, "learning_rate": 0.001, "num_update_epochs": 6, "network_type": "Densenet_Same", "densenet_bn_size": 4, "densenet_growth_rate": 32, "densenet_num_layers": "4,4,4", "optimizer_norm_clip": 2.0, "log_directory": "experiment_10_nodes_2_agents_2_critic_decay", "hand_crafted_graph": "None", "wandb_mode": "disabled", "wandb_project_name": "no_name", "yaml_file": "sweep_config_node_10.yaml", "wandb_sweep": false, "wandb_sweep_id": null, "sweep_run_count": 3, "factor_inference_timesteps": 2000, "graph_mode": "load", "graph_identifier": "normalized_node_10_agent_2_prop_0.8", "load_network_directory": null, "factor_testing_timesteps": 200, "frequency_testing": 20, "learning_curve_average_window": 5, "num_steps_before_update": 2300, "gae_lambda": 0.95, "clip_eps": 0.10255, "vf_coeff": 0.135, "ent_coeff": 0.11246, "anneal_ent_coeff": true, "ent_coeff_schedule": "sigmoid", "num_minibatches": 1, "deterministic_inference_policy": true, "num_stored_graphs": 14000, "sigmoid_beginning_offset_num": 0, "sigmoid_total_nums_all": 10000, "num_critic_values": 2, "individual_reward_weight": 0.3767, "anneal_individual_reward_weight": "linear", "autoencoder_weights": null}
+{"n_node": 10, "n_agent": 2, "time_steps": 4000000, "reward_for_invalid_action": -200.0, "reward_service_goal": -0.1, "reward_fail_to_service_goal_larger_index": -0.61, "reward_exceed_horizon": -4.7, "horizon_length_factor": 2, "prop_stoch": 0.8, "k_edges": null, "random_seed_for_training": 100, "random_seed_for_inference": 101, "discount_factor": 1.0, "learning_rate": 0.001, "num_update_epochs": 6, "network_type": "Densenet_Same", "densenet_bn_size": 4, "densenet_growth_rate": 32, "densenet_num_layers": "4,4,4", "optimizer_norm_clip": 2.0, "log_directory": "10_nodes_2_agents/experiment_10_nodes_2_agents_2_critic_decay", "hand_crafted_graph": "None", "wandb_mode": "disabled", "wandb_project_name": "no_name", "yaml_file": "sweep_config_node_10.yaml", "wandb_sweep": false, "wandb_sweep_id": null, "sweep_run_count": 3, "factor_inference_timesteps": 2000, "graph_mode": "load", "graph_identifier": "normalized_node_10_agent_2_prop_0.8", "load_network_directory": null, "factor_testing_timesteps": 200, "frequency_testing": 20, "learning_curve_average_window": 5, "num_steps_before_update": 2300, "gae_lambda": 0.95, "clip_eps": 0.10255, "vf_coeff": 0.19, "ent_coeff": 0.08, "anneal_ent_coeff": true, "ent_coeff_schedule": "sigmoid", "num_minibatches": 1, "deterministic_inference_policy": true, "num_stored_graphs": 14000, "sigmoid_beginning_offset_num": 0, "sigmoid_total_nums_all": 10000, "num_critic_values": 2, "individual_reward_weight": 0.34791, "anneal_individual_reward_weight": "linear", "autoencoder_weights": null}
 {
-    "current_datetime": "2025-03-08 14:29:01"
+    "current_datetime": "2025-03-10 21:01:22"
 }
-{"Total training time in seconds": 3875.9136033058167}
+{"Total training time in seconds": 8651.772156000137}
 Testing results: 
 {
-    "average_competitive_ratio": 3.0524919033050537,
-    "average_competitive_ratio_excluding_failed_episodes": 1.2231158018112183,
-    "median_competitive_ratio_exclude": 1.1386138200759888,
-    "min_competitive_ratio_exclude": 0.9850746393203735,
-    "first_quartile_competitive_ratio_exclude": 1.0256410837173462,
-    "third_quartile_competitive_ratio_exclude": 1.3296703100204468,
-    "max_competitive_ratio_exclude": 5.254902362823486,
-    "average_reward_exclude": -1.3157367706298828,
-    "failure_rate (%)": 32.71263210870659,
-    "standard_deviation_of_competitive_ratio_exclude": 0.28376662731170654,
-    "average_competitive_ratio_of_optimistic_baseline_exclude": 1.0922209024429321,
-    "max_competitive_ratio_of_optimistic_baseline_exclude": 2.6806721687316895,
-    "median_competitive_ratio_of_optimistic_baseline_exclude": 1.0,
-    "min_competitive_ratio_of_optimistic_baseline_exclude": 0.9756097793579102,
+    "average_competitive_ratio": 1.193064570426941,
+    "average_competitive_ratio_excluding_failed_episodes": 1.0902613401412964,
+    "median_competitive_ratio_exclude": 1.0,
+    "min_competitive_ratio_exclude": 0.9855072498321533,
+    "first_quartile_competitive_ratio_exclude": 1.0,
+    "third_quartile_competitive_ratio_exclude": 1.1157894134521484,
+    "max_competitive_ratio_exclude": 5.3434343338012695,
+    "average_reward_exclude": -1.3087986707687378,
+    "failure_rate (%)": 1.7818444497953287,
+    "standard_deviation_of_competitive_ratio_exclude": 0.19565002620220184,
+    "average_competitive_ratio_of_optimistic_baseline_exclude": 1.1359367370605469,
+    "max_competitive_ratio_of_optimistic_baseline_exclude": 7.481481075286865,
+    "median_competitive_ratio_of_optimistic_baseline_exclude": 1.023668646812439,
+    "min_competitive_ratio_of_optimistic_baseline_exclude": 0.9841269850730896,
     "first_quartile_competitive_ratio_of_optimistic_baseline_exclude": 1.0,
-    "third_quartile_competitive_ratio_of_optimistic_baseline_exclude": 1.0990991592407227,
-    "standard_deviation_competitive_ratio_of_optimistic_baseline_exclude": 0.19754475355148315,
-    "percentage_RL_beats_optimistic_baseline": 10.920986411675894,
-    "percentage_RL_equals_to_optimistic_baseline": 12.68243583291394,
-    "multi_objective_metric": 11.797496813182178
+    "third_quartile_competitive_ratio_of_optimistic_baseline_exclude": 1.2013363242149353,
+    "standard_deviation_competitive_ratio_of_optimistic_baseline_exclude": 0.26610705256462097,
+    "percentage_RL_beats_optimistic_baseline": 37.56320732000963,
+    "percentage_RL_equals_to_optimistic_baseline": 35.85359980736817,
+    "multi_objective_metric": 1.3844174276029446
 }
 
 Network architecture: 

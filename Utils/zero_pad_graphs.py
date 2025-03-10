@@ -114,7 +114,7 @@ if __name__ == "__main__":
     # Get all handcrafted graphs -> Zero pad to make them 10 nodes -> Save in the same format as inference graphs. Separate file for each handcrafted graph
     # Delauney graphs with 5,7,9 nodes and zero pad to be 10 ->  Save in the same format as inference graphs
     # Final: separate folders with training_graphs taken from previous and new inference_graphs. Use pre-trained network (from prop 0.4) and just perform inference.
-
+    """
     # Zero pad handcrafted graphs
     n_node, stored_graph = get_sacrifice_in_choosing_goals_graph()
     # vmapping over scalar arguments, even when their in_axis is None, is problematic -> that's why we have to do the class and self workaround
@@ -187,14 +187,26 @@ if __name__ == "__main__":
     np.save(inference_graph_npy_file, np.array(zero_padded_graph))
     training_graph_npy_file = os.path.join(directory, "training_graphs.npy")
     np.save(training_graph_npy_file, np.array(zero_padded_graph))
+    """
 
     # Zero pad delauney graphs
-    # Read from a file. Need to create these inference graphs first (prop 0.2)
-    """
+    # Read from a file. Need to create these inference graphs first (prop 0.1 or 0.2 for 5 nodes)
+    parent_directory = os.path.dirname(os.getcwd())
+    n_node = 9
     directory = os.path.join(
-        parent_directory, "Generated_graphs", "node_5_agent_2_prop_0.2"
+        parent_directory, "Generated_graphs", "9_nodes_2_agents_prop_0.1"
     )
     stored_graphs = np.load(os.path.join(directory, "inference_graphs.npy"))
     stored_graph_maker = StoredGraphs(n_node, 10, 2, 1)
-    zero_padded_graph = jax.vmap(stored_graph_maker.zero_pad_graph)(stored_graph)
-    """
+    zero_padded_graph = jax.vmap(stored_graph_maker.zero_pad_graph)(stored_graphs)
+    directory = os.path.join(
+        parent_directory,
+        "Generated_graphs",
+        "Zero_padded_delauney_original_9_nodes_2_agents",
+    )
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    inference_graph_npy_file = os.path.join(directory, "inference_graphs.npy")
+    np.save(inference_graph_npy_file, np.array(zero_padded_graph))
+    training_graph_npy_file = os.path.join(directory, "training_graphs.npy")
+    np.save(training_graph_npy_file, np.array(zero_padded_graph))
