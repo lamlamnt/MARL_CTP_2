@@ -1,0 +1,16 @@
+method: bayes               
+metric:
+  name: multi_objective_metric  
+  goal: minimize           
+parameters:
+  clip_eps:
+    min: 0.06
+    max: 0.16
+  vf_coeff:
+    min: 0.11
+    max: 0.22
+  ent_coeff:
+    min: 0.05
+    max: 0.15
+  
+  

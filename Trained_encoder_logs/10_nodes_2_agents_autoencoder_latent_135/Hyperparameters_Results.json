@@ -1,0 +1,30 @@
+{"n_node": 10, "n_agent": 2, "reward_for_invalid_action": -200.0, "reward_service_goal": -0.1, "reward_fail_to_service_goal_larger_index": -0.5, "reward_exceed_horizon": -1.5, "horizon_length_factor": 2, "prop_stoch": 0.8, "k_edges": null, "random_seed": 100, "network_type": "Densenet_Same", "num_critic_values": 1, "densenet_bn_size": 4, "densenet_growth_rate": 32, "densenet_num_layers": "4,4,4", "graph_identifier": "normalized_node_10_agent_2_prop_0.8", "load_network_directory": "10_nodes_2_agents/experiment_10_nodes_2_agents_1_critic_team", "autoencoder_weights_file": "autoencoder_weights.flax", "num_epochs": 250, "learning_rate": 0.0058, "num_steps_to_collect": 1000, "weight_decay": 0.0083, "hidden_size": 96, "latent_size": 135, "percent_random_walk": 0.3, "kernel_size": 3, "validation_set_size": 1000, "log_directory": "10_nodes_2_agents_autoencoder_latent_135", "wandb_mode": "disabled", "wandb_project_name": "no_name", "yaml_file": "sweep_autoencoder.yaml", "wandb_sweep": false, "sweep_run_count": 3}
+{
+    "current_datetime": "2025-03-10 23:57:47"
+}
+{"Total training time in seconds": 274.53513956069946}
+{"Final training loss": 0.08785273879766464}
+{"Final validation loss": 0.10062321275472641}
+
+Network architecture: 
+params/decoder/ConvTranspose_0/bias: (24,)
+params/decoder/ConvTranspose_0/kernel: (3, 12, 24)
+params/decoder/ConvTranspose_1/bias: (48,)
+params/decoder/ConvTranspose_1/kernel: (3, 24, 48)
+params/decoder/ConvTranspose_2/bias: (96,)
+params/decoder/ConvTranspose_2/kernel: (3, 48, 96)
+params/decoder/ConvTranspose_3/bias: (6,)
+params/decoder/ConvTranspose_3/kernel: (1, 1, 96, 6)
+params/decoder/Dense_0/bias: (360,)
+params/decoder/Dense_0/kernel: (135, 360)
+params/encoder/Conv_0/bias: (96,)
+params/encoder/Conv_0/kernel: (1, 1, 6, 96)
+params/encoder/Conv_1/bias: (48,)
+params/encoder/Conv_1/kernel: (3, 96, 48)
+params/encoder/Conv_2/bias: (24,)
+params/encoder/Conv_2/kernel: (3, 48, 24)
+params/encoder/Conv_3/bias: (12,)
+params/encoder/Conv_3/kernel: (3, 24, 12)
+params/encoder/Dense_0/bias: (135,)
+params/encoder/Dense_0/kernel: (360, 135)
+Total number of parameters in the network: 135489

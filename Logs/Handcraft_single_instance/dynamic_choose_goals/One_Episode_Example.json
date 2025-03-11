@@ -1,0 +1,12 @@
+[
+    "Optimal cost: 0.60009765625\n",
+    "Time step: 1\n",
+    "Actions: [3 2]\n",
+    "Rewards: [-0.1 -0.1]\n",
+    "Time step: 2\n",
+    "Actions: [4 5]\n",
+    "Rewards: [-0.1 -0.1]\n",
+    "Time step: 3\n",
+    "Actions: [7 7]\n",
+    "Rewards: [-0.1 -0.1]\n"
+]
