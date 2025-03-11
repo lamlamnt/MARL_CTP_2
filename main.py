@@ -219,10 +219,12 @@ def main(args):
         first_json_str = match.group(0)  # Extract the JSON substring
         first_json_dict = json.loads(first_json_str)  # Convert to dictionary
         latent_size = first_json_dict["latent_size"]
+        kernel_size = first_json_dict["kernel_size"]
         autoencoder_model = Autoencoder(
             hidden_size=first_json_dict["hidden_size"],
             latent_size=latent_size,
             output_size=state_shape,
+            kernel_size=kernel_size,
         )
         autoencoder_weights_path = os.path.join(
             current_directory,
