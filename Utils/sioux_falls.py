@@ -4,7 +4,7 @@ import sys
 
 sys.path.append("..")
 from Environment import CTP_generator
-from Utils.normalize_add_expensive_edge import get_expected_optimal_total_cost
+from Utils import normalize_add_expensive_edge
 import os
 import numpy as np
 
@@ -245,7 +245,11 @@ def get_Sioux_Falls_Network(
         )
 
         # Normalize the weights
-        normalizing_factor = get_expected_optimal_total_cost(graph_realisation, key)
+        normalizing_factor = (
+            normalize_add_expensive_edge.get_expected_optimal_total_cost(
+                graph_realisation, key
+            )
+        )
         normalized_weights = jnp.where(
             weights != CTP_generator.NOT_CONNECTED,
             weights / normalizing_factor,
