@@ -4,7 +4,6 @@ import sys
 
 sys.path.append("..")
 from Environment import CTP_generator
-from Utils import normalize_add_expensive_edge
 import os
 import numpy as np
 
@@ -195,6 +194,9 @@ def get_Sioux_Falls_Network(
     assert n_edges == len(senders)
     assert n_edges == len(receivers)
 
+    # move import inside function to prevent circular import
+    from Utils.normalize_add_expensive_edge import get_expected_optimal_total_cost
+
     def get_one_stored_graph(key) -> tuple[jnp.ndarray, jnp.ndarray]:
         # get blocking prob matrix
         def __assign_prob_edge(subkey, is_stochastic_edge):
@@ -245,11 +247,7 @@ def get_Sioux_Falls_Network(
         )
 
         # Normalize the weights
-        normalizing_factor = (
-            normalize_add_expensive_edge.get_expected_optimal_total_cost(
-                graph_realisation, key
-            )
-        )
+        normalizing_factor = get_expected_optimal_total_cost(graph_realisation, key)
         normalized_weights = jnp.where(
             weights != CTP_generator.NOT_CONNECTED,
             weights / normalizing_factor,
