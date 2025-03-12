@@ -19,5 +19,5 @@ if __name__ == "__main__":
     # params = model.init(key, jnp.ones((1, 6, 12, 10)))
 
     action_mask = jnp.ones(11)
-    model = Densenet_1D(10)
+    model = Densenet_1D(10, growth_rate=10, bn_size=2)
     params = model.init(key, jnp.ones((1, 170)), action_mask)

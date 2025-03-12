@@ -87,6 +87,7 @@ class DenseNet(nn.Module):
         c_hidden = (
             self.growth_rate * self.bn_size
         )  # The start number of hidden channels
+
         x = nn.Conv(
             x.shape[-1],
             kernel_size=(1,),

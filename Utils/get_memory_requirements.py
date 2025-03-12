@@ -12,14 +12,20 @@ from Networks.densenet import (
     DenseNet_ActorCritic_Same,
 )
 from Networks.autoencoder import Autoencoder
+from Networks.densenet_after_autoencoder import Densenet_1D
 
 
-def get_model_memory_usage(model, input_shape, batch_size, activation_size):
+def get_model_memory_usage(
+    model, input_shape, batch_size, activation_size, action_mask=None
+):
     """
     Estimate theoretical memory required for training a Flax model in bytes (32-bit precision).
     """
     dummy_input = jnp.ones(input_shape)
-    variables = model.init(jax.random.PRNGKey(0), dummy_input)
+    if action_mask is None:
+        variables = model.init(jax.random.PRNGKey(0), dummy_input)
+    else:
+        variables = model.init(jax.random.PRNGKey(0), dummy_input, action_mask)
 
     param_sizes = [
         reduce(operator.mul, p.shape, 1)
@@ -67,11 +73,21 @@ def get_total_output_size(file_name):
 
 
 if __name__ == "__main__":
+    """
     total_10_nodes_2_agents = get_total_output_size("Output_size_10_nodes_2_agents.txt")
     total_20_nodes_2_agents = get_total_output_size("Output_size_20_nodes_2_agents.txt")
     total_30_nodes_2_agents = get_total_output_size("Output_size_30_nodes_2_agents.txt")
     total_20_nodes_4_agents = get_total_output_size("Output_size_20_nodes_4_agents.txt")
     total_30_nodes_4_agents = get_total_output_size("Output_size_30_nodes_4_agents.txt")
+    total_10_nodes_2_agents_autoencoder = get_total_output_size(
+        "Output_size_autoencoder_10_nodes_2_agents.txt"
+    )
+    """
+    total_10_nodes_2_agents_autoencoder_policy_network = get_total_output_size(
+        "Output_size_densenet1d_growth_rate10_bn_size2.txt"
+    )
+    print(total_10_nodes_2_agents_autoencoder_policy_network)
+    """
     model = DenseNet_ActorCritic_Same(
         10,
         num_layers=(4, 4, 4),
@@ -140,4 +156,25 @@ if __name__ == "__main__":
         model, input_shape, batch_size, total_30_nodes_4_agents
     )
     print(total_30_nodes_4_agents)
-    print(node_30_agent_4_memory)
+    print(node_30_agent_4_memory)"
+
+    model = Autoencoder(170, 96, (6, 12, 10), 3, 2)
+    batch_size = 1000
+    input_shape = (1, 6, 12, 10)
+    autoencoder_memory = get_model_memory_usage(
+        model, input_shape, batch_size, total_10_nodes_2_agents_autoencoder
+    )
+    """
+
+    model = Densenet_1D(10)
+    batch_size = 4600
+    input_shape = (1, 170)
+    action_mask = jnp.ones(11)
+    densenet1d_memory = get_model_memory_usage(
+        model,
+        input_shape,
+        batch_size,
+        total_10_nodes_2_agents_autoencoder_policy_network,
+        action_mask,
+    )
+    print(densenet1d_memory)
