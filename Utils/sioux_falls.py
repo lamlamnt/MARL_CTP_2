@@ -139,7 +139,7 @@ def get_Sioux_Falls_Network(
     )
     # assert senders and receivers are correct
     for i in range(len(senders)):
-        if weights[senders[i], receivers[i]] != nc:
+        if weights[senders[i], receivers[i]] == nc:
             print(senders[i], receivers[i])
         assert weights[senders[i], receivers[i]] != nc
     n_edges = 27

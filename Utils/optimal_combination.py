@@ -6,7 +6,6 @@ import sys
 
 sys.path.append("..")
 from Environment import CTP_generator
-from Environment import CTP_environment
 import itertools
 
 
