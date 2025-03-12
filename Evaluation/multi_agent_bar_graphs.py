@@ -18,7 +18,7 @@ def percentage_all_nodes_80():
     x_axis_title = "Number of Nodes"
     y_axis_title = "Percentage (%)"
     values = [
-        [0, 0, 0, 0],
+        [38.73, 34.93, 73.66, 0.98],
         [0, 0, 0, 0],
         [0, 0, 0, 0],
     ]
@@ -40,7 +40,7 @@ def percentage_all_nodes_40():
     x_axis_title = "Number of Nodes"
     y_axis_title = "Percentage (%)"
     values = [
-        [0, 0, 0, 0],
+        [21.79, 42.24, 64.03, 0.97],
         [0, 0, 0, 0],
         [0, 0, 0, 0],
     ]
@@ -71,7 +71,7 @@ def mean_median_std_all_nodes_80():
     x_axis_title = "Number of Nodes"
     y_axis_title = "Value"
     values = [
-        [0, 0, 0, 0, 0, 0],
+        [1.0873, 1.0, 0.2009, 1.1358, 1.0241, 0.2839],
         [0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0],
     ]
@@ -98,11 +98,11 @@ def mean_median_std_all_nodes_40():
         "rgb(102, 178, 255)",
         "rgb(119, 221, 119)",
     ]
-    title = "Statistics Excluding Failed Episodes for MA-CTP with 80% Stochastic Edges"
+    title = "Statistics Excluding Failed Episodes for MA-CTP with 40% Stochastic Edges"
     x_axis_title = "Number of Nodes"
     y_axis_title = "Value"
     values = [
-        [0, 0, 0, 0, 0, 0],
+        [1.0573, 1.0, 0.1044, 1.1044, 1.0, 0.1169],
         [0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0],
     ]

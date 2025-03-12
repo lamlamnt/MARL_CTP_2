@@ -25,7 +25,7 @@ def plot_store_results_autoencoder(log_directory, start_time, model_params, out,
     plt.figure()
     plt.plot(out["training_loss"], label="Train loss")
     plt.plot(out["validation_loss"], label="Validation loss")
-    plt.xlabel("Epoch")
+    plt.xlabel("Number of Updates")
     plt.ylabel("Loss")
     plt.legend()
     plt.title("Training and Validation Loss")

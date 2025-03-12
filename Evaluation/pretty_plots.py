@@ -10,13 +10,14 @@ def plot_learning_curve_general(
     names, average_window, num_steps_before_update, frequency_testing, title, file_name
 ):
     legend_labels = [
-        "Individual",
-        "Team",
-        "2 Critic - Decay",
-        "Mixed at 0.5",
-        "Linear Decay From Mixed",
+        "1 Critic - Individual",
+        "1 Critic - Team",
+        "1 Critic - Mixed at 0.5",
+        "1 Critic - Linear Decay",
+        "2 Critics - Mixed at 0.5",
+        "2 Critics - Linear Decay",
     ]
-    colors = ["red", "black", "green", "blue", "yellow"]
+    colors = ["red", "black", "green", "blue", "yellow", "purple"]
     current_directory = os.getcwd()
     parent_dir = os.path.dirname(current_directory)
     log_directory_names = [os.path.join(parent_dir, "Logs", name) for name in names]

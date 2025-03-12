@@ -12,13 +12,16 @@ def learning_curve_10_nodes_2_agents():
         ),
         os.path.join("10_nodes_2_agents", "experiment_10_nodes_2_agents_1_critic_team"),
         os.path.join(
-            "10_nodes_2_agents", "experiment_10_nodes_2_agents_2_critic_decay"
-        ),
-        os.path.join(
             "10_nodes_2_agents", "experiment_10_nodes_2_agents_1_critic_mixed_no_decay"
         ),
         os.path.join(
-            "10_nodes_2_agents", "experiment_10_nodes_2_agents_1_critic_decay_best"
+            "10_nodes_2_agents", "experiment_10_nodes_2_agents_1_critic_decay"
+        ),
+        os.path.join(
+            "10_nodes_2_agents", "experiment_10_nodes_2_agents_2_critic_constant"
+        ),
+        os.path.join(
+            "10_nodes_2_agents", "experiment_10_nodes_2_agents_2_critic_decay"
         ),
     ]
     plot_learning_curve_general(
@@ -38,13 +41,16 @@ def learning_curve_20_nodes_2_agents():
         ),
         os.path.join("20_nodes_2_agents", "experiment_20_nodes_2_agents_1_critic_team"),
         os.path.join(
-            "20_nodes_2_agents", "experiment_20_nodes_2_agents_2_critic_decay"
-        ),
-        os.path.join(
             "20_nodes_2_agents", "experiment_20_nodes_2_agents_1_critic_mixed_no_decay"
         ),
         os.path.join(
-            "20_nodes_2_agents", "experiment_20_nodes_2_agents_1_critic_decay_best"
+            "20_nodes_2_agents", "experiment_20_nodes_2_agents_1_critic_decay"
+        ),
+        os.path.join(
+            "20_nodes_2_agents", "experiment_20_nodes_2_agents_2_critic_constant"
+        ),
+        os.path.join(
+            "20_nodes_2_agents", "experiment_20_nodes_2_agents_2_critic_decay"
         ),
     ]
     plot_learning_curve_general(
@@ -63,4 +69,4 @@ def learning_curve_20_nodes_4_agents():
 
 if __name__ == "__main__":
     learning_curve_10_nodes_2_agents()
-    learning_curve_20_nodes_2_agents()
+    # learning_curve_20_nodes_2_agents()
