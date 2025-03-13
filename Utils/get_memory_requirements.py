@@ -72,22 +72,12 @@ def get_total_output_size(file_name):
     return total
 
 
-if __name__ == "__main__":
-    """
+def non_autoencoder_get_memory():
     total_10_nodes_2_agents = get_total_output_size("Output_size_10_nodes_2_agents.txt")
     total_20_nodes_2_agents = get_total_output_size("Output_size_20_nodes_2_agents.txt")
     total_30_nodes_2_agents = get_total_output_size("Output_size_30_nodes_2_agents.txt")
     total_20_nodes_4_agents = get_total_output_size("Output_size_20_nodes_4_agents.txt")
     total_30_nodes_4_agents = get_total_output_size("Output_size_30_nodes_4_agents.txt")
-    total_10_nodes_2_agents_autoencoder = get_total_output_size(
-        "Output_size_autoencoder_10_nodes_2_agents.txt"
-    )
-    """
-    total_10_nodes_2_agents_autoencoder_policy_network = get_total_output_size(
-        "Output_size_densenet1d_growth_rate10_bn_size2.txt"
-    )
-    print(total_10_nodes_2_agents_autoencoder_policy_network)
-    """
     model = DenseNet_ActorCritic_Same(
         10,
         num_layers=(4, 4, 4),
@@ -156,25 +146,71 @@ if __name__ == "__main__":
         model, input_shape, batch_size, total_30_nodes_4_agents
     )
     print(total_30_nodes_4_agents)
-    print(node_30_agent_4_memory)"
+    print(node_30_agent_4_memory)
 
-    model = Autoencoder(170, 96, (6, 12, 10), 3, 2)
-    batch_size = 1000
-    input_shape = (1, 6, 12, 10)
-    autoencoder_memory = get_model_memory_usage(
-        model, input_shape, batch_size, total_10_nodes_2_agents_autoencoder
-    )
-    """
 
-    model = Densenet_1D(10)
-    batch_size = 4600
-    input_shape = (1, 170)
-    action_mask = jnp.ones(11)
-    densenet1d_memory = get_model_memory_usage(
-        model,
-        input_shape,
-        batch_size,
-        total_10_nodes_2_agents_autoencoder_policy_network,
-        action_mask,
-    )
-    print(densenet1d_memory)
+def autoencoder_get_memory():
+    autoencoder_activation_files = [
+        "Output_size_autoencoder_170.txt",
+        "Output_size_autoencoder_135.txt",
+        "Output_size_autoencoder_100.txt",
+        "Output_size_autoencoder_65.txt",
+    ]
+    policy_network_full_files = [
+        "Output_size_densenet1d_170.txt",
+        "Output_size_densenet1d_135.txt",
+        "Output_size_densenet1d_100.txt",
+    ]
+    policy_network_small_files = [
+        "Output_size_densenet1d_170_growth_rate_10_bn_size_2.txt",
+        "Output_size_densenet1d_135_growth_rate_12_bn_size_2.txt",
+        "Output_size_densenet1d_100_growth_rate_12_bn_size_2.txt",
+    ]
+    latent_sizes = [170, 135, 100, 65]
+    growth_rate = [10, 12, 12]
+    for i, file in enumerate(autoencoder_activation_files):
+        autoencoder_activation = get_total_output_size(file)
+        print(autoencoder_activation)
+        model = Autoencoder(latent_sizes[i], 96, (6, 12, 10), 3, 2)
+        batch_size = 1000
+        input_shape = (1, 6, 12, 10)
+        autoencoder_memory = get_model_memory_usage(
+            model, input_shape, batch_size, autoencoder_activation
+        )
+        print(autoencoder_memory)
+        if i < 3:
+            policy_network_activation_full = get_total_output_size(
+                policy_network_full_files[i]
+            )
+            print(policy_network_activation_full)
+            batch_size = 4600
+            input_shape = (1, latent_sizes[i])
+            action_mask = jnp.ones(11)
+            model = Densenet_1D(10)
+            policy_network_memory_full = get_model_memory_usage(
+                model,
+                input_shape,
+                batch_size,
+                policy_network_activation_full,
+                action_mask,
+            )
+            print(policy_network_memory_full)
+
+            model = Densenet_1D(10, growth_rate=growth_rate[i], bn_size=2)
+            policy_network_activation_small = get_total_output_size(
+                policy_network_small_files[i]
+            )
+            print(policy_network_activation_small)
+            policy_network_memory_full = get_model_memory_usage(
+                model,
+                input_shape,
+                batch_size,
+                policy_network_activation_small,
+                action_mask,
+            )
+            print(policy_network_memory_full)
+
+
+if __name__ == "__main__":
+    # non_autoencoder_get_memory()
+    autoencoder_get_memory()

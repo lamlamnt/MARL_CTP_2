@@ -25,7 +25,7 @@ class DenseLayer(nn.Module):
             kernel_size=(1,),
             kernel_init=self.densenet_kernel_init,
             bias_init=constant(0.0),
-        )(x)
+        )(z)
         z = self.act_fn(z)
         z = nn.Conv(
             self.growth_rate,

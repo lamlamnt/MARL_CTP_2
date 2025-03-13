@@ -15,9 +15,9 @@ if __name__ == "__main__":
     key = jax.random.PRNGKey(100)
     # params = model.init(key, jnp.ones((6, 34, 30)))
 
-    # model = Autoencoder(170, 96, (6, 12, 10), 3, 2)
+    # model = Autoencoder(65, 96, (6, 12, 10), 3, 2)
     # params = model.init(key, jnp.ones((1, 6, 12, 10)))
 
     action_mask = jnp.ones(11)
-    model = Densenet_1D(10, growth_rate=10, bn_size=2)
-    params = model.init(key, jnp.ones((1, 170)), action_mask)
+    model = Densenet_1D(10, growth_rate=12, bn_size=2)
+    params = model.init(key, jnp.ones((1, 135)), action_mask)
