@@ -235,5 +235,5 @@ if __name__ == "__main__":
     np.save(inference_graph_npy_file, np.array(stored_graphs))
     # dummy training_graphs
     training_graph_npy_file = os.path.join(directory, "training_graphs.npy")
-    dummy_training_graphs = np.zeros((1, 3, 20, 20), dtype=np.float16)
+    dummy_training_graphs = np.zeros((5, 3, 20, 20), dtype=np.float16)
     np.save(training_graph_npy_file, np.array(dummy_training_graphs))
