@@ -26,8 +26,20 @@ for i, (label, values) in enumerate(group_data.items()):
     # Add shaded region for standard deviation
     fig.add_trace(
         go.Scatter(
-            x=[i - 0.2, i + 0.2, i - 0.2, i + 0.2],
-            y=[mean - std, mean + std, mean + std, mean - std],
+            x=[
+                i - 0.2,
+                i + 0.2,
+                i + 0.2,
+                i - 0.2,
+                i - 0.2,
+            ],  # Define four corners and close the shape
+            y=[
+                mean - std,
+                mean - std,
+                mean + std,
+                mean + std,
+                mean - std,
+            ],  # Four corners in proper order
             fill="toself",
             mode="none",
             fillcolor=colors[i],
@@ -37,7 +49,7 @@ for i, (label, values) in enumerate(group_data.items()):
     )
     legend_shown["std"] = True
 
-    # Add min/max lines
+    # Add min/max vertical line
     fig.add_trace(
         go.Scatter(
             x=[i, i],
@@ -48,6 +60,27 @@ for i, (label, values) in enumerate(group_data.items()):
         )
     )
     legend_shown["minmax"] = True
+
+    # Min/Max Horizontal Lines
+    fig.add_trace(
+        go.Scatter(
+            x=[i - 0.1, i + 0.1],
+            y=[min_val, min_val],
+            mode="lines",
+            line=dict(color="blue", width=2),
+            showlegend=False,
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[i - 0.1, i + 0.1],
+            y=[max_val, max_val],
+            mode="lines",
+            line=dict(color="blue", width=2),
+            showlegend=False,
+        )
+    )
 
     # Add median line
     fig.add_trace(
@@ -73,6 +106,60 @@ for i, (label, values) in enumerate(group_data.items()):
     )
     legend_shown["mean"] = True
 
+    fig.add_trace(
+        go.Scatter(
+            x=[i + 0.1],  # Shift right for clarity
+            y=[mean + 5],
+            text=[f"{mean:.2f}"],
+            mode="text",
+            textposition="middle right",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[i + 0.1],
+            y=[median],
+            text=[f"{median:.2f}"],
+            mode="text",
+            textposition="middle right",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[i + 0.1],
+            y=[min_val],
+            text=[f"{min_val:.2f}"],
+            mode="text",
+            textposition="middle right",
+            showlegend=False,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[i + 0.1],
+            y=[max_val],
+            text=[f"{max_val:.2f}"],
+            mode="text",
+            textposition="middle right",
+            showlegend=False,
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[i - 0.1],
+            y=[mean],
+            text=[f"{std:.2f}"],
+            mode="text",
+            textposition="middle left",
+            showlegend=False,
+        )
+    )
+
+# adjust the width and height to make the plot more horizontal.
+# Can also adjust margin size and move legend
 fig.update_layout(
     title="Statistical Summary for Groups",
     xaxis=dict(
@@ -82,6 +169,8 @@ fig.update_layout(
     ),
     yaxis_title="Value",
     showlegend=True,
+    width=900,
+    height=500,
 )
 
 fig.show()
