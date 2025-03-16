@@ -2,145 +2,88 @@ import sys
 
 sys.path.append("..")
 from Evaluation.pretty_plots import plot_bar_graph_plotly_general
+from Evaluation.new_plots_general import (
+    percentage_bar_plot_general,
+    box_whisker_general,
+)
+import numpy as np
 
 
-def single_agent_plot_percentage_all_num_nodes():
+def single_agent_plot_percentage():
     groups = ["5 nodes", "10 nodes", "30 nodes"]
-    categories = [
-        "RL Beats OB",
-        "RL Equals OB",
-        "RL Beats or Equals OB",
-        "Failure Rate for RL",
-    ]
-    colors = ["red", "blue", "green", "yellow"]
-    title = "Single-agent CTP with 80% Stochastic Edges"
     x_axis_title = "Number of Nodes"
     y_axis_title = "Percentage (%)"
+
+    title = "Single-Agent CTP with 80% Stochastic Edges"
     values = [
-        [8.06, 87.95, 96.01, 0],
-        [26.37, 50.96, 77.33, 0.80],
-        [37.03, 18.11, 55.14, 3.64],
+        [8.06, 87.95, 0.0],
+        [26.37, 50.96, 0.80],
+        [37.03, 18.11, 3.64],
     ]
-    plot_bar_graph_plotly_general(
-        groups, categories, values, title, x_axis_title, y_axis_title, colors
-    )
+    percentage_bar_plot_general(groups, values, title, x_axis_title, y_axis_title)
+
+    title = "Single-Agent CTP with 40% Stochastic Edges"
+    values = [[8.24, 86.37, 0], [21.68, 53.33, 0.3980], [30.09, 19.23, 0.1706]]
+    percentage_bar_plot_general(groups, values, title, x_axis_title, y_axis_title)
+
+    title = "Single-Agent CTP with Mixed-Percentage Stochastic Edges"
+    values = [[9.62, 84.46, 0], [21.37, 53.62, 0.68], [30.08, 16.14, 0.35]]
+    percentage_bar_plot_general(groups, values, title, x_axis_title, y_axis_title)
 
 
-def single_agent_plot_percentage_node_10():
-    groups = ["20%", "40%", "80%", "Mixed"]
-    categories = [
-        "RL Beats OB",
-        "RL Equals OB",
-        "RL Beats or Equals OB",
-        "Failure Rate for RL",
-    ]
-    colors = ["red", "blue", "green", "yellow"]
-    title = (
-        "Single-Agent CTP on 10-Node Graphs at Different Percent of Stochastic Edges"
-    )
-    x_axis_title = "Percentage of Stochastic Edges"
-    y_axis_title = "Percentage (%)"
-    values = [
-        [13.38, 63.61, 76.99, 0.14],
-        [21.68, 53.33, 75.01, 0.40],
-        [26.37, 50.96, 77.33, 0.80],
-        [21.37, 53.62, 74.99, 0.68],
-    ]
-    plot_bar_graph_plotly_general(
-        groups, categories, values, title, x_axis_title, y_axis_title, colors
-    )
-
-
-def single_agent_plot_mean_median_all_num_nodes():
+def single_agent_plot_box_whisker():
     groups = [
-        "5 nodes",
-        "10 nodes",
-        "30 nodes",
+        "5 Nodes RL",
+        "5 Nodes OB",
+        "10 Nodes RL",
+        "10 Nodes OB",
+        "30 Nodes RL",
+        "30 Nodes OB",
     ]
-    categories = [
-        "Mean RL",
-        "Median RL",
-        "Std RL",
-        "Max RL",
-        "Mean OB",
-        "Median OB",
-        "Std OB",
-        "Max OB",
-    ]
-    colors = [
-        "rgb(139, 0, 0)",
-        "rgb(0, 0, 139)",
-        "rgb(0,139,0)",
-        "rgb(204, 153, 0)",
-        "rgb(255, 102, 102)",
-        "rgb(102, 178, 255)",
-        "rgb(119, 221, 119)",
-        "rgb(255, 255, 153)",
-    ]
-    title = "Statistics Excluding Failed Episodes for Single-agent CTP with 80% Stochastic Edges"
-    x_axis_title = "Number of Nodes"
-    y_axis_title = "Competitive Ratio"
-    values = [
-        [1.029, 1.000, 0.141, 3.039, 1.058, 1.000, 0.200, 2.429],
-        [1.092, 1.000, 0.249, 3.280, 1.147, 1.000, 0.332, 3.784],
-        [1.207, 1.103, 0.289, 3.107, 1.223, 1.071, 0.351, 4.253],
-    ]
-    plot_bar_graph_plotly_general(
-        groups,
-        categories,
-        values,
-        title,
-        x_axis_title,
-        y_axis_title,
-        colors,
-        shift_num_columns=4,
-        bar_width=0.1,
+    title = "Statistics Excluding Failed Episodes for Single-Agent CTP with 80% Stochastic Edges"
+    values_prop_80 = np.array(
+        [
+            [1.029, 1.0, 0.141, 1.0, 3.039],
+            [1.058, 1.0, 0.200, 1.0, 2.429],
+            [1.092, 1.0, 0.249, 1.0, 3.280],
+            [1.147, 1.0, 0.332, 1.0, 3.784],
+            [1.207, 1.103, 0.289, 1.0, 3.107],
+            [1.223, 1.071, 0.351, 1.0, 4.253],
+        ]
     )
+    box_whisker_general(values_prop_80, title, groups)
+
+    title = "Statistics Excluding Failed Episodes for Single-Agent CTP with 40% Stochastic Edges"
+    values_prop_40 = np.array(
+        [
+            [1.0179, 1.0, 0.07934, 1.0, 1.6935],
+            [1.0465, 1.0, 0.1572, 1.0, 2.1683],
+            [1.04296, 1.0, 0.1231, 1.0, 2.56],
+            [1.0678, 1.0, 0.1856, 1.0, 2.915],
+            [1.0808, 1.0, 0.1104, 1.0, 2.23],
+            [1.0704, 1.0, 0.1380, 1.0, 2.71],
+        ]
+    )
+    box_whisker_general(values_prop_40, title, groups)
+
+    title = "Statistics Excluding Failed Episodes for Single-Agent CTP with Mixed-Percentage Stochastic Edges"
+    values_mixed = np.array(
+        [
+            [1.0236, 1.0, 0.1131, 1.0, 2.2609],
+            [1.0542, 1.0, 0.1936, 1.0, 2.5644],
+            [1.0596, 1.0, 0.1905, 1.0, 3.9065],
+            [1.0802, 1.0, 0.2402, 1.0, 3.907],
+            [1.1464, 1.0, 0.2147, 1.0, 3.016],
+            [1.1344, 1.0, 0.2468, 1.0, 3.097],
+        ]
+    )
+    box_whisker_general(values_mixed, title, groups)
 
 
-def single_agent_plot_mean_median_node_10():
-    groups = [
-        "20%",
-        "40%",
-        "80%",
-        "Mixed",
-    ]
-    categories = [
-        "Mean RL",
-        "Median RL",
-        "Std RL",
-        "Max RL",
-        "Mean OB",
-        "Median OB",
-        "Std OB",
-        "Max OB",
-    ]
-    colors = [
-        "rgb(139, 0, 0)",
-        "rgb(0, 0, 139)",
-        "rgb(0,139,0)",
-        "rgb(204, 153, 0)",
-        "rgb(255, 102, 102)",
-        "rgb(102, 178, 255)",
-        "rgb(119, 221, 119)",
-        "rgb(255, 255, 153)",
-    ]
-    title = "Statistics Excluding Failed Episodes for Single-Agent CTP on 10-Node Graphs at Different Levels of Stochasticity"
-    x_axis_title = "Percentage of Stochastic Edges"
-    y_axis_title = "Competitive Ratio"
-    values = [
-        [1.021, 1.000, 0.086, 2.862, 1.028, 1.000, 0.111, 2.225],
-        [1.043, 1.000, 0.123, 2.560, 1.068, 1.000, 0.186, 2.915],
-        [1.092, 1.000, 0.249, 3.280, 1.147, 1.000, 0.332, 3.784],
-        [1.060, 1.000, 0.190, 3.907, 1.080, 1.000, 0.240, 3.907],
-    ]
-    plot_bar_graph_plotly_general(
-        groups, categories, values, title, x_axis_title, y_axis_title, colors, 4, 0.11
-    )
+def plot_learning_curve_30_nodes():
+    pass
 
 
 if __name__ == "__main__":
-    # single_agent_plot_percentage_all_num_nodes()
-    # single_agent_plot_percentage_node_10()
-    # single_agent_plot_mean_median_all_num_nodes()
-    single_agent_plot_mean_median_node_10()
+    # single_agent_plot_percentage()
+    single_agent_plot_box_whisker()

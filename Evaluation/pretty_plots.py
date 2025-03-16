@@ -7,8 +7,29 @@ import plotly.express as px
 
 
 def plot_learning_curve_general(
-    names, average_window, num_steps_before_update, frequency_testing, title, file_name
+    names,
+    average_window,
+    num_steps_before_update,
+    frequency_testing,
+    title,
+    file_name,
+    first_graph=True,
 ):
+    if first_graph:
+        legend_labels = [
+            "1 Critic - Individual",
+            "1 Critic - Team",
+            "1 Critic - Mixed at 0.5",
+        ]
+        colors = ["red", "black", "green"]
+    else:
+        legend_labels = [
+            "1 Critic - Linear Decay",
+            "2 Critics - Mixed at 0.5",
+            "2 Critics - Linear Decay",
+        ]
+        colors = ["blue", "yellow", "purple"]
+    """
     legend_labels = [
         "1 Critic - Individual",
         "1 Critic - Team",
@@ -17,7 +38,8 @@ def plot_learning_curve_general(
         "2 Critics - Mixed at 0.5",
         "2 Critics - Linear Decay",
     ]
-    colors = ["red", "black", "green", "blue", "yellow", "purple"]
+    colors = ["red", "black", "green", "blue", "yellow", "purple"]"
+    """
     current_directory = os.getcwd()
     parent_dir = os.path.dirname(current_directory)
     log_directory_names = [os.path.join(parent_dir, "Logs", name) for name in names]
