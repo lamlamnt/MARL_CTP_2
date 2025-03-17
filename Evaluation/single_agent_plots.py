@@ -1,33 +1,43 @@
 import sys
 
 sys.path.append("..")
-from Evaluation.pretty_plots import plot_bar_graph_plotly_general
 from Evaluation.new_plots_general import (
     percentage_bar_plot_general,
     box_whisker_general,
 )
 import numpy as np
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def single_agent_plot_percentage():
-    groups = ["5 nodes", "10 nodes", "30 nodes"]
-    x_axis_title = "Number of Nodes"
+    groups = [
+        "5 Nodes 40%",
+        "5 Nodes 80%",
+        "5 Nodes Mixed",
+        "10 Nodes 40%",
+        "10 Nodes 80%",
+        "10 Nodes Mixed",
+        "30 Nodes 40%",
+        "30 Nodes 80%",
+        "30 Nodes Mixed",
+    ]
+    x_axis_title = "Number of Nodes and Percentage of Stochastic Edges"
     y_axis_title = "Percentage (%)"
 
-    title = "Single-Agent CTP with 80% Stochastic Edges"
+    title = "Single-Agent CTP"
     values = [
-        [8.06, 87.95, 0.0],
-        [26.37, 50.96, 0.80],
-        [37.03, 18.11, 3.64],
+        [8.2, 86.4, 0.0],
+        [8.1, 88.0, 0.0],
+        [9.6, 84.5, 0.0],
+        [21.7, 53.3, 0.4],
+        [26.4, 51.0, 0.8],
+        [21.4, 53.6, 0.7],
+        [30.1, 19.2, 0.2],
+        [35.8, 16.5, 0.4],
+        [30.1, 16.1, 0.3],
     ]
-    percentage_bar_plot_general(groups, values, title, x_axis_title, y_axis_title)
-
-    title = "Single-Agent CTP with 40% Stochastic Edges"
-    values = [[8.24, 86.37, 0], [21.68, 53.33, 0.3980], [30.09, 19.23, 0.1706]]
-    percentage_bar_plot_general(groups, values, title, x_axis_title, y_axis_title)
-
-    title = "Single-Agent CTP with Mixed-Percentage Stochastic Edges"
-    values = [[9.62, 84.46, 0], [21.37, 53.62, 0.68], [30.08, 16.14, 0.35]]
     percentage_bar_plot_general(groups, values, title, x_axis_title, y_axis_title)
 
 
@@ -81,9 +91,46 @@ def single_agent_plot_box_whisker():
 
 
 def plot_learning_curve_30_nodes():
-    pass
+    folder = "C:\\Users\\shala\\Documents\\Oxford Undergrad\\4th Year\\4YP\\For Report Writing\\single_agent_node_30_combined"
+    average_window = 5
+    num_steps_before_update = 6000
+    frequency_testing = 20
+    csv_location = os.path.join(folder, "learning_curve_series.csv")
+    learning_curve_series = pd.read_csv(csv_location, header=None).iloc[1:, 0]
+
+    # Do rolling mean and std for each
+    rolling_mean = learning_curve_series.rolling(
+        window=average_window, min_periods=1
+    ).mean()
+    rolling_std = learning_curve_series.rolling(
+        window=average_window, min_periods=1
+    ).std()
+
+    plt.plot(
+        num_steps_before_update
+        * frequency_testing
+        * np.arange(len(learning_curve_series)),
+        rolling_mean,
+        linestyle="-",
+        color="red",
+    )
+    plt.fill_between(
+        num_steps_before_update
+        * frequency_testing
+        * np.arange(len(learning_curve_series)),
+        rolling_mean - rolling_std,
+        rolling_mean + rolling_std,
+        color="blue",
+        alpha=0.2,
+    )
+    plt.title("Learning Curve for 30 Nodes and 80% Stochastic Edges")
+    plt.xlabel("Training Timesteps")
+    plt.ylabel("Average Competitive Ratio")
+    plt.savefig(os.path.join(folder, "learning_curve_full.png"))
+    plt.close()
 
 
 if __name__ == "__main__":
     # single_agent_plot_percentage()
     single_agent_plot_box_whisker()
+    # plot_learning_curve_30_nodes()

@@ -5,10 +5,12 @@ import os
 import pandas as pd
 
 
-def percentage_bar_plot_general(group_names, values, title, x_axis_title, y_axis_title):
+def percentage_bar_plot_general(
+    group_names, values, title, x_axis_title, y_axis_title, width=1400
+):
     fig = go.Figure()
     num_groups = len(values)  # num_rows
-    x_positions = np.linspace(0, 3, num_groups)
+    x_positions = np.linspace(0, 2.7, num_groups)
 
     for i, x in enumerate(x_positions):
         fig.add_trace(
@@ -20,6 +22,7 @@ def percentage_bar_plot_general(group_names, values, title, x_axis_title, y_axis
                 text=[values[i][0]],
                 textposition="auto",
                 showlegend=(i == 0),
+                width=0.1,
             )
         )
         fig.add_trace(
@@ -31,18 +34,20 @@ def percentage_bar_plot_general(group_names, values, title, x_axis_title, y_axis
                 text=[values[i][1]],
                 textposition="auto",
                 showlegend=(i == 0),
+                width=0.1,
             )
         )
         adjusted_value = max(values[i][2], 0.01)
         fig.add_trace(
             go.Bar(
-                x=[x + 0.5],  # Offset for separation
+                x=[x + 0.1],  # Offset for separation
                 y=[adjusted_value],
                 name="Failure Rate for RL",
                 marker_color="#89CFF0",
                 text=[values[i][2]],
                 textposition="auto",
                 showlegend=(i == 0),
+                width=0.1,
             )
         )
 
@@ -58,16 +63,16 @@ def percentage_bar_plot_general(group_names, values, title, x_axis_title, y_axis
         ),
         yaxis_title=y_axis_title,
         template="plotly_white",
-        xaxis_tickangle=-45,
-        width=800,
-        height=600,
+        xaxis_tickangle=-15,
+        width=width,
+        height=500,
     )
 
     # Show figure
     fig.show()
 
 
-def box_whisker_general(all_values, title, group_names):
+def box_whisker_general(all_values, title, group_names, width=900):
     # Create figure
     fig = go.Figure()
     colors = ["#FFA07A", "#87CEFA", "#FFA07A", "#87CEFA", "#FFA07A", "#87CEFA"]
@@ -95,7 +100,7 @@ def box_whisker_general(all_values, title, group_names):
                 mode="none",
                 fillcolor=colors[i % len(colors)],
                 opacity=0.4,
-                name="Standard Deviation" if i == 0 else None,
+                name="Std" if i == 0 else None,
                 showlegend=(i == 0),
             )
         )
@@ -107,7 +112,7 @@ def box_whisker_general(all_values, title, group_names):
                 y=[min_val, max_val],
                 mode="lines",
                 line=dict(color="darkblue", width=2),
-                name="Min/Max" if i == 0 else None,
+                name="Max" if i == 0 else None,
                 showlegend=(i == 0),
             )
         )
@@ -199,7 +204,7 @@ def box_whisker_general(all_values, title, group_names):
         ),
         yaxis_title="Competitive Ratio",
         showlegend=True,
-        width=900,  # Adjusted width
+        width=width,  # Adjusted width
         height=600,
     )
 
