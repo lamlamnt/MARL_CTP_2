@@ -206,13 +206,13 @@ def get_Sioux_Falls_Network(
             CTP_generator.NOT_CONNECTED,
         )
 
-        one_stored_graph = jnp.zeros((1, 3, n_nodes, n_nodes), dtype=jnp.float16)
-        one_stored_graph = one_stored_graph.at[0, 0, :, :].set(normalized_weights)
-        one_stored_graph = one_stored_graph.at[0, 1, :, :].set(blocking_prob_matrix)
-        one_stored_graph = one_stored_graph.at[0, 2, 0, :].set(
+        one_stored_graph = jnp.zeros((3, n_nodes, n_nodes), dtype=jnp.float16)
+        one_stored_graph = one_stored_graph.at[0, :, :].set(normalized_weights)
+        one_stored_graph = one_stored_graph.at[1, :, :].set(blocking_prob_matrix)
+        one_stored_graph = one_stored_graph.at[2, 0, :].set(
             jnp.zeros(n_nodes, dtype=int).at[origins].set(1)
         )
-        one_stored_graph = one_stored_graph.at[0, 2, 1, :].set(
+        one_stored_graph = one_stored_graph.at[2, 1, :].set(
             jnp.zeros(n_nodes, dtype=int).at[goals].set(1)
         )
         return one_stored_graph
