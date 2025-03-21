@@ -1,3 +1,4 @@
+import argparse
 import jax.numpy as jnp
 import jax
 import sys
@@ -225,15 +226,46 @@ def get_Sioux_Falls_Network(
 
 
 if __name__ == "__main__":
-    key = jax.random.PRNGKey(30)
-    stored_graphs = get_Sioux_Falls_Network(key, 0.8, 2000)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--seed_training", type=int, default=30, help="Seed for random number"
+    )
+    parser.add_argument(
+        "--seed_inference", type=int, default=31, help="Seed for random number"
+    )
+    parser.add_argument(
+        "--num_training_graphs",
+        type=int,
+        default=2000,
+        help="Number of graphs to generate",
+    )
+    parser.add_argument(
+        "--num_inference_graphs",
+        type=int,
+        default=667,
+        help="Number of graphs to generate",
+    )
+    parser.add_argument(
+        "--folder_name",
+        type=str,
+        default="Sioux_Falls_1",
+        help="Name of the folder to save the generated graphs",
+    )
+    args = parser.parse_args()
+    key_training = jax.random.PRNGKey(args.seed_training)
+    training_graphs = get_Sioux_Falls_Network(
+        key_training, 0.8, args.num_training_graphs
+    )
     parent_directory = os.path.dirname(os.getcwd())
-    directory = os.path.join(parent_directory, "Generated_graphs", "Sioux_Falls_0.8")
+    directory = os.path.join(parent_directory, "Generated_graphs", args.folder_name)
     if not os.path.exists(directory):
         os.makedirs(directory)
-    inference_graph_npy_file = os.path.join(directory, "inference_graphs.npy")
-    np.save(inference_graph_npy_file, np.array(stored_graphs))
-    # dummy training_graphs
     training_graph_npy_file = os.path.join(directory, "training_graphs.npy")
-    dummy_training_graphs = stored_graphs[:5]
-    np.save(training_graph_npy_file, np.array(dummy_training_graphs))
+    np.save(training_graph_npy_file, np.array(training_graphs))
+
+    key_testing = jax.random.PRNGKey(args.seed_inference)
+    inference_graphs = get_Sioux_Falls_Network(
+        key_testing, 0.8, args.num_inference_graphs
+    )
+    inference_graph_npy_file = os.path.join(directory, "inference_graphs.npy")
+    np.save(inference_graph_npy_file, np.array(inference_graphs))
