@@ -6,11 +6,18 @@ import pandas as pd
 
 
 def percentage_bar_plot_general(
-    group_names, values, title, x_axis_title, y_axis_title, width=1400
+    group_names,
+    values,
+    title,
+    x_axis_title,
+    y_axis_title,
+    colors,
+    width=1400,
+    fatness=2.7,
 ):
     fig = go.Figure()
     num_groups = len(values)  # num_rows
-    x_positions = np.linspace(0, 2.7, num_groups)
+    x_positions = np.linspace(0, fatness, num_groups)
 
     for i, x in enumerate(x_positions):
         fig.add_trace(
@@ -18,7 +25,7 @@ def percentage_bar_plot_general(
                 x=[x],
                 y=[values[i][0]],
                 name="Percentage of Episodes RL Beats OB",
-                marker_color="#FFB6C1",
+                marker_color=colors[0][i],
                 text=[values[i][0]],
                 textposition="auto",
                 showlegend=(i == 0),
@@ -30,7 +37,7 @@ def percentage_bar_plot_general(
                 x=[x],
                 y=[values[i][1]],
                 name="Percentage of Episodes RL Equals OB",
-                marker_color="#FF6961",
+                marker_color=colors[1][i],
                 text=[values[i][1]],
                 textposition="auto",
                 showlegend=(i == 0),
@@ -43,7 +50,7 @@ def percentage_bar_plot_general(
                 x=[x + 0.1],  # Offset for separation
                 y=[adjusted_value],
                 name="Failure Rate for RL",
-                marker_color="#89CFF0",
+                marker_color=colors[2][i],
                 text=[values[i][2]],
                 textposition="auto",
                 showlegend=(i == 0),
@@ -61,7 +68,10 @@ def percentage_bar_plot_general(
             ticktext=list(group_names),
             title=x_axis_title,  # Display correct labels
         ),
-        yaxis_title=y_axis_title,
+        yaxis=dict(
+            title=y_axis_title,
+            range=[0, 100],  # Force y-axis to show 0-100%
+        ),
         template="plotly_white",
         xaxis_tickangle=-15,
         width=width,
@@ -219,6 +229,7 @@ def plot_learning_curve_general(
     title,
     file_name,
     first_graph=True,
+    ylim_top=10,
 ):
     if first_graph:
         legend_labels = [
@@ -226,14 +237,14 @@ def plot_learning_curve_general(
             "1 Critic - Team",
             "1 Critic - Mixed at 0.5",
         ]
-        colors = ["red", "black", "green"]
+        colors = ["red", "black", "blue"]
     else:
         legend_labels = [
             "1 Critic - Linear Decay",
             "2 Critics - Mixed at 0.5",
             "2 Critics - Linear Decay",
         ]
-        colors = ["blue", "yellow", "purple"]
+        colors = ["olive", "orange", "purple"]  # can try brown or pink as well
     current_directory = os.getcwd()
     parent_dir = os.path.dirname(current_directory)
     log_directory_names = [os.path.join(parent_dir, "Logs", name) for name in names]
@@ -252,13 +263,24 @@ def plot_learning_curve_general(
             )
             learning_curve_series = pd.read_csv(csv_location, header=None).iloc[1:, 0]
 
-            # Do rolling mean and std for each
-            rolling_mean = learning_curve_series.rolling(
-                window=average_window, min_periods=1
-            ).mean()
-            rolling_std = learning_curve_series.rolling(
-                window=average_window, min_periods=1
-            ).std()
+            # Replace the 10 with empty
+            if j == 1:
+                learning_curve_series = learning_curve_series.replace(10, np.nan)
+                # If one of the values is NaN, then whole thing NaN
+                rolling_mean = learning_curve_series.rolling(
+                    window=average_window, min_periods=average_window
+                ).mean()
+                rolling_std = learning_curve_series.rolling(
+                    window=average_window, min_periods=average_window
+                ).std()
+            else:
+                # Do rolling mean and std for each
+                rolling_mean = learning_curve_series.rolling(
+                    window=average_window, min_periods=1
+                ).mean()
+                rolling_std = learning_curve_series.rolling(
+                    window=average_window, min_periods=1
+                ).std()
 
             plt.plot(
                 num_steps_before_update
@@ -278,10 +300,18 @@ def plot_learning_curve_general(
                 color=colors[i],
                 alpha=0.2,
             )
-        plt.title(title)
+        if j == 2:
+            plt.axhline(y=0.0, color="green", linestyle="--")
+        else:
+            plt.axhline(y=1.0, color="green", linestyle="--")  # horizontal line
+        if j == 0:
+            plt.ylim(0, ylim_top)
         plt.xlabel("Training Timesteps")
         plt.ylabel(y_axis_names[j])
         plt.legend()
         location_of_plot = os.path.join(parent_dir, "Logs/Unit_Tests")
-        plt.savefig(os.path.join(location_of_plot, file_name + "_" + str(j) + ".png"))
+        plt.savefig(
+            os.path.join(location_of_plot, file_name + "_" + str(j) + ".pdf"),
+            bbox_inches="tight",
+        )
         plt.close()

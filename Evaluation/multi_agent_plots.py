@@ -12,14 +12,14 @@ from Evaluation.new_plots_general import (
 
 def percentage_all_nodes_all_prop():
     groups = [
-        "10 Nodes 2 Agents 40%",
-        "10 Nodes 2 Agents 80%",
-        "20 Nodes 2 Agents 40%",
-        "20 Nodes 2 Agents 80%",
-        "20 Nodes 4 Agents 40%",
-        "20 Nodes 4 Agents 80%",
+        "10, 2, 40%",
+        "10, 2, 80%",
+        "20, 2, 40%",
+        "20, 2, 80%",
+        "20, 4, 40%",
+        "20, 4, 80%",
     ]
-    x_axis_title = "Experiments"
+    x_axis_title = "Number of Nodes, Number of Agents, Percentage of Stochastic Edges"
     y_axis_title = "Percentage (%)"
     title = "Multi-Agent CTP"
     values = [
@@ -30,8 +30,41 @@ def percentage_all_nodes_all_prop():
         [18.5, 2.7, 0.45],
         [37.7, 4.6, 2.3],
     ]
+    colors = [
+        [
+            "#C8E6C9",
+            "#66BB6A",
+            "#C8E6C9",
+            "#66BB6A",
+            "#C8E6C9",
+            "#66BB6A",
+        ],
+        [
+            "#BBDEFB",
+            "#42A5F5",
+            "#BBDEFB",
+            "#42A5F5",
+            "#BBDEFB",
+            "#42A5F5",
+        ],
+        [
+            "#FFCDD2",
+            "#EF5350",
+            "#FFCDD2",
+            "#EF5350",
+            "#FFCDD2",
+            "#EF5350",
+        ],
+    ]
     percentage_bar_plot_general(
-        groups, values, title, x_axis_title, y_axis_title, width=1500
+        groups,
+        values,
+        title,
+        x_axis_title,
+        y_axis_title,
+        colors,
+        width=1500,
+        fatness=2.0,
     )
 
 
@@ -115,5 +148,5 @@ def bar_memory_performance():
 
 if __name__ == "__main__":
     percentage_all_nodes_all_prop()
-    box_whisker_all_nodes_all_prop()
-    bar_memory_performance()
+    # box_whisker_all_nodes_all_prop()
+    # bar_memory_performance()
