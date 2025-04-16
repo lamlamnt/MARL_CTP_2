@@ -103,7 +103,7 @@ def box_whisker_all_nodes_all_prop():
     box_whisker_general(values, title, groups, width=1800)
 
 
-def bar_memory_performance():
+def bar_memory_performance_old():
     memory = [6, 66, 79, 79, 83]
     percentage = [73.7, 54.1, 42.3, 39.3, 14.8]
     groups = [
@@ -146,7 +146,63 @@ def bar_memory_performance():
     fig.show()
 
 
+def bar_memory_performance():
+    memory = [6, 66, 79, 79, 83]
+    percentage = [73.7, 54.1, 42.3, 39.3, 14.8]
+    groups = [
+        "10 Nodes 2 Agents",
+        "20 Nodes 2 Agents",
+        "20 Nodes 4 Agents",
+        "30 Nodes 2 Agents",
+        "30 Nodes 4 Agents",
+    ]
+
+    fig = go.Figure()
+
+    # First bar (percentage) on left y-axis (shown on the left in each group)
+    fig.add_trace(
+        go.Bar(
+            x=groups,
+            y=percentage,
+            name="Percentage RL Beats or Equals OB",
+            marker_color="lightgreen",
+            text=percentage,
+            textposition="outside",
+            yaxis="y1",
+            offsetgroup=0,
+        )
+    )
+
+    # Second bar (memory) on right y-axis (shown on the right in each group)
+    fig.add_trace(
+        go.Bar(
+            x=groups,
+            y=memory,
+            name="Memory (GB)",
+            marker_color="lightcoral",
+            text=memory,
+            textposition="outside",
+            yaxis="y2",
+            offsetgroup=1,
+        )
+    )
+
+    fig.update_layout(
+        barmode="group",
+        title="Memory and Performance of RL",
+        xaxis_title="Number of Nodes and Agents",
+        yaxis=dict(title="Percentage (%)", range=[0, 100], side="left"),
+        yaxis2=dict(title="Memory (GB)", range=[0, 100], overlaying="y", side="right"),
+        legend_title="",
+        width=1000,
+        height=500,
+    )
+    fig.update_layout(showlegend=False)
+
+    fig.show()
+
+
 if __name__ == "__main__":
-    percentage_all_nodes_all_prop()
+    # percentage_all_nodes_all_prop()
     # box_whisker_all_nodes_all_prop()
-    # bar_memory_performance()
+    bar_memory_performance()

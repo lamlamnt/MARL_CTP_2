@@ -28,8 +28,10 @@ def plot_store_results_autoencoder(log_directory, start_time, model_params, out,
     plt.xlabel("Number of Updates")
     plt.ylabel("Loss")
     plt.legend()
-    plt.title("Training and Validation Loss")
-    plt.savefig(os.path.join(log_directory, "training_validation_loss.png"))
+    # plt.title("Training and Validation Loss")
+    plt.savefig(
+        os.path.join(log_directory, "training_validation_loss.pdf"), bbox_inches="tight"
+    )
     plt.close()
 
     # Write to JSON file

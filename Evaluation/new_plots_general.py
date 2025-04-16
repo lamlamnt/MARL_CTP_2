@@ -250,8 +250,8 @@ def plot_learning_curve_general(
     log_directory_names = [os.path.join(parent_dir, "Logs", name) for name in names]
     plt.figure(figsize=(10, 6))
     y_axis_names = [
-        "Average Competitive Ratio",
-        "Average Competitive Ratio Excluding Failed Episodes",
+        "Mean Competitive Ratio (Including Failed Episodes)",
+        "Mean Competitive Ratio Excluding Failed Episodes",
         "Failure Rate",
     ]
 

@@ -166,7 +166,7 @@ def plot_learning_curve_30_nodes():
     plt.gca().yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
     plt.ylim(0.5, 3)
     plt.xlabel("Training Timesteps")
-    plt.ylabel("Average Competitive Ratio")
+    plt.ylabel("Mean Competitive Ratio (Including Failed Episodes)")
     plt.savefig(
         os.path.join(folder, "learning_curve_full_new_30_nodes.pdf"),
         bbox_inches="tight",
@@ -212,7 +212,7 @@ def plot_learning_curve_10_nodes():
     plt.gca().yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
     plt.ylim(0.5, 3)
     plt.xlabel("Training Timesteps")
-    plt.ylabel("Average Competitive Ratio")
+    plt.ylabel("Mean Competitive Ratio (Including Failed Episodes)")
     plt.savefig(
         os.path.join(folder, "learning_curve_full_new_10_nodes.pdf"),
         bbox_inches="tight",
