@@ -14,6 +14,8 @@ def percentage_bar_plot_general(
     colors,
     width=1400,
     fatness=2.7,
+    x_axis_tickangle=-15,
+    height=500,
 ):
     fig = go.Figure()
     num_groups = len(values)  # num_rows
@@ -73,9 +75,9 @@ def percentage_bar_plot_general(
             range=[0, 100],  # Force y-axis to show 0-100%
         ),
         template="plotly_white",
-        xaxis_tickangle=-15,
+        xaxis_tickangle=x_axis_tickangle,
         width=width,
-        height=500,
+        height=height,
     )
 
     # Show figure

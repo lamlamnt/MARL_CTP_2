@@ -202,7 +202,48 @@ def bar_memory_performance():
     fig.show()
 
 
+def percentage_autoencoder():
+    groups = [
+        "Without Encoder",
+        "Using Encoder - Latent Size 100",
+    ]
+    x_axis_title = "Method"
+    y_axis_title = "Percentage (%)"
+    title = "Multi-Agent CTP"
+    values = [
+        [38.73, 34.93, 0.98],
+        [21.6, 24.7, 16.2],
+    ]
+    colors = [
+        [
+            "#66BB6A",
+            "#66BB6A",
+        ],
+        [
+            "#42A5F5",
+            "#42A5F5",
+        ],
+        [
+            "#EF5350",
+            "#EF5350",
+        ],
+    ]
+    percentage_bar_plot_general(
+        groups,
+        values,
+        title,
+        x_axis_title,
+        y_axis_title,
+        colors,
+        width=800,
+        fatness=0.5,
+        x_axis_tickangle=0,
+        height=500,
+    )
+
+
 if __name__ == "__main__":
     # percentage_all_nodes_all_prop()
     # box_whisker_all_nodes_all_prop()
-    bar_memory_performance()
+    # bar_memory_performance()
+    percentage_autoencoder()
