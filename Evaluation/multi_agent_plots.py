@@ -65,6 +65,8 @@ def percentage_all_nodes_all_prop():
         colors,
         width=1500,
         fatness=2.0,
+        x_axis_tickangle=0,
+        x_axis_offset=0.05,
     )
 
 
@@ -243,7 +245,7 @@ def percentage_autoencoder():
 
 
 if __name__ == "__main__":
-    # percentage_all_nodes_all_prop()
+    percentage_all_nodes_all_prop()
     # box_whisker_all_nodes_all_prop()
     # bar_memory_performance()
-    percentage_autoencoder()
+    # percentage_autoencoder()

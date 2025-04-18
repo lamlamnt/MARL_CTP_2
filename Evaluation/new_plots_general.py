@@ -16,6 +16,7 @@ def percentage_bar_plot_general(
     fatness=2.7,
     x_axis_tickangle=-15,
     height=500,
+    x_axis_offset=0.1,
 ):
     fig = go.Figure()
     num_groups = len(values)  # num_rows
@@ -66,7 +67,7 @@ def percentage_bar_plot_general(
         title=title,
         xaxis=dict(
             tickmode="array",
-            tickvals=list(x_positions),  # Position ticks correctly
+            tickvals=list(x_positions + x_axis_offset),  # Position ticks correctly
             ticktext=list(group_names),
             title=x_axis_title,  # Display correct labels
         ),

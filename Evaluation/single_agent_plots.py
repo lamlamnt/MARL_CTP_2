@@ -221,7 +221,7 @@ def plot_learning_curve_10_nodes():
 
 
 if __name__ == "__main__":
-    # single_agent_plot_percentage()
+    single_agent_plot_percentage()
     # single_agent_plot_box_whisker()
-    plot_learning_curve_30_nodes()
-    plot_learning_curve_10_nodes()
+    # plot_learning_curve_30_nodes()
+    # plot_learning_curve_10_nodes()
